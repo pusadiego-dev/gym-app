@@ -252,11 +252,18 @@ function sessionCard(s) {
 
 // FORMULARIO DE PERFIL
 function viewForm() {
-  const p = store.obj("profile") || { experiencia: "principiante", objetivo: "hipertrofia", dias: 3, duracion: 60, equipo: "completo", limitaciones: [], prioridades: [] };
+  const g = drive.getUser();
+  const isNew = !store.obj("profile");
+  const p = store.obj("profile") || { nombre: g?.nombre || "", avatar: g?.foto || null, experiencia: "principiante", objetivo: "hipertrofia", dias: 3, duracion: 60, equipo: "completo", limitaciones: [], prioridades: [] };
+  if (isNew && pendingAvatar === undefined && g?.foto) pendingAvatar = g.foto;
+  const googleBox = !isNew ? "" : g
+    ? `<p class="card small google-ok">Conectado con Google como <b>${esc(g.email)}</b>. Hemos rellenado tu nombre y tu foto; completa el resto.</p>`
+    : drive.clientId() ? `<div class="card google-cta"><b>¿Tienes cuenta de Google?</b><p class="small muted">Conéctala para rellenar tu nombre y tu foto, guardar tus datos en tu Drive y recuperarlos si ya usaste Gym App en otro dispositivo.</p><button class="btn primary block" type="button" data-act="driveConnect">Conectar con Google</button></div>` : "";
   const radio = (name, opts, val) => opts.map(([v, l, d]) => `<label class="opt"><input type="radio" name="${name}" value="${v}" ${String(val) === String(v) ? "checked" : ""}><span><b>${l}</b>${d ? `<small>${d}</small>` : ""}</span></label>`).join("");
   const check = (name, opts, vals) => opts.map(([v, l]) => `<label class="chip-check"><input type="checkbox" name="${name}" value="${v}" ${vals.includes(v) ? "checked" : ""}><span>${l}</span></label>`).join("");
   return `
   <header class="page-h"><h1>${store.obj("profile") ? "Editar perfil" : "Crea tu perfil"}</h1><p class="muted">Con tus respuestas generamos una rutina semanal basada en la evidencia científica.</p></header>
+  ${googleBox}
   <form id="profileForm" class="form">
     <fieldset><legend>Sobre ti</legend>
       <div class="avatar-pick"><span id="formAvatarPreview">${avatarHtml(pendingAvatar !== undefined ? { ...p, avatar: pendingAvatar } : p, "lg")}</span>
@@ -543,7 +550,7 @@ function viewProfile() {
   <header class="page-h"><h1>Perfil</h1></header>
   ${p ? `<section class="card"><div class="profile-top">${avatarHtml(p, "lg")}<div><h3>${esc(p.nombre)}</h3>
       <div class="row-btns"><label class="btn ghost small">Cambiar foto<input type="file" accept="image/*" id="avatarFile" hidden></label>${p.avatar ? `<button class="btn danger-ghost small" data-act="removeAvatar">Quitar</button>` : ""}<a class="btn ghost small" href="#/formulario">Editar perfil</a></div></div></div>
-    <p class="muted small">${[p.edad && `${p.edad} años`, p.peso && `${fmt(+p.peso)} kg`, p.altura && `${p.altura} cm`].filter(Boolean).join(" · ")}</p>
+    ${drive.getUser()?.email ? `<p class="muted small">${esc(drive.getUser().email)}</p>` : ""}<p class="muted small">${[p.edad && `${p.edad} años`, p.peso && `${fmt(+p.peso)} kg`, p.altura && `${p.altura} cm`].filter(Boolean).join(" · ")}</p>
     <p>${P.LEVELS[p.experiencia]?.label} · ${P.GOALS[p.objetivo]?.label} · ${p.dias} días · ${p.duracion} min</p></section>` : `<a class="btn primary block" href="#/formulario">Crear perfil</a>`}
   <section class="card sync-card"><h3>Sincronización con Google Drive</h3>
     <p class="muted small">Tus datos se guardan en este dispositivo y, si conectas Google, en una carpeta privada de tu Drive que solo ve esta app. Así los tienes en el iPhone, la tablet y el ordenador.</p>
@@ -690,7 +697,17 @@ const actions = {
   goalDone: (b) => { const g = store.live("goals").find((x) => x.id === b.dataset.id); store.upsert("goals", { ...g, cumplido: today() }); rerenderKeepScroll(); },
   goalToAch: (b) => { const g = store.live("goals").find((x) => x.id === b.dataset.id); achForm({ titulo: goalTitle(g), emoji: "🎯", goalId: g.id }); },
   delAch: (b) => { if (confirmBox("¿Borrar logro?")) { store.remove("achievements", b.dataset.id); rerenderKeepScroll(); } },
-  driveConnect: async () => { try { await drive.connect(); toast("Conectado con Google Drive"); } catch (e) { toast(e.message); } render(); },
+  driveConnect: async () => {
+    const onForm = document.body.dataset.route === "formulario";
+    try {
+      await drive.connect();
+      const hasProfile = !!store.obj("profile");
+      fillFromGoogle();
+      toast(onForm && hasProfile ? "Datos recuperados de tu Drive" : "Conectado con Google");
+      if (onForm && hasProfile) { location.hash = "#/hoy"; return; }
+    } catch (e) { toast(e.message); }
+    render();
+  },
   driveSync: async () => { try { if (drive.hasToken()) await drive.sync(); else await drive.connect(); toast("Sincronizado"); } catch (e) { if (e.message !== "expired") toast(e.message); } render(); },
   driveDisconnect: () => { if (confirmBox("¿Desconectar Google Drive? Tus datos se quedan en este dispositivo.")) { drive.disconnect(); render(); } },
   themeMode: (b) => saveTheme({ modo: b.dataset.v }),
@@ -711,6 +728,15 @@ const actions = {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
 };
+// Completa nombre y foto del perfil con la cuenta de Google si están vacíos.
+function fillFromGoogle() {
+  const g = drive.getUser(), p = store.obj("profile");
+  if (!g || !p) return;
+  const patch = {};
+  if (!p.nombre && g.nombre) patch.nombre = g.nombre;
+  if (!p.avatar && g.foto) patch.avatar = g.foto;
+  if (Object.keys(patch).length) store.setObject("profile", { ...p, ...patch });
+}
 function editRoutine(fn, close) {
   const r = structuredClone(store.obj("routine"));
   fn(r);
@@ -824,7 +850,7 @@ $("#sync").addEventListener("click", async () => {
   if (!drive.clientId() || drive.getStatus().state === "off") { location.hash = "#/perfil"; return; }
   try { if (drive.hasToken()) await drive.sync(); else await drive.connect(); } catch (e) { if (e.message !== "expired") toast(e.message); }
 });
-drive.onStatus(() => { renderSyncChip(); if (document.body.dataset.route === "perfil") render(); });
+drive.onStatus(() => { renderSyncChip(); if (document.body.dataset.route === "perfil" || (document.body.dataset.route === "formulario" && !store.obj("profile") && drive.getUser() && !$("input[name=nombre]")?.value)) render(); });
 store.subscribe((_, source) => {
   if (source === "sync" || source === "wipe") theme.apply(store.get().settings?.tema);
   if (source === "sync" && document.body.dataset.route !== "entreno") rerenderKeepScroll();

@@ -348,3 +348,5 @@ ul.plain { list-style: none; padding: 0 !important; }
 .custom-colors { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 12px; }
 .custom-colors label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; font-weight: 600; color: var(--text-2); }
 .custom-colors input[type=color] { width: 72px; height: 44px; padding: 2px; }
+.google-ok { background: var(--good-soft); border-color: transparent; }
+.google-cta b { display: block; margin-bottom: 2px; }

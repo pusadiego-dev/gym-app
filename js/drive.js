@@ -3,7 +3,8 @@
 import { GOOGLE_CLIENT_ID } from "./config.js";
 import * as store from "./store.js";
 
-const SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+const SCOPE = "openid email profile https://www.googleapis.com/auth/drive.appdata";
+const USER_KEY = "gymapp:googleUser";
 const FILE = "gymapp-data.json";
 const TOKEN_KEY = "gymapp:token";
 const CONNECTED_KEY = "gymapp:driveConnected";
@@ -18,6 +19,17 @@ const listeners = new Set();
 
 export const clientId = () => localStorage.getItem(CID_KEY) || GOOGLE_CLIENT_ID || "";
 export const setClientId = (v) => { localStorage.setItem(CID_KEY, v.trim()); tokenClient = null; };
+// Datos básicos de la cuenta de Google (nombre, correo, foto) para rellenar el perfil.
+export const getUser = () => { try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; } };
+async function fetchUser() {
+  try {
+    const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${token.value}` } });
+    if (!r.ok) return;
+    const u = await r.json();
+    const user = { nombre: u.given_name || u.name || "", nombreCompleto: u.name || "", email: u.email || "", foto: u.picture ? u.picture.replace(/=s\d+(-c)?$/, "") + "=s256-c" : "" };
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {}
+}
 export const wasConnected = () => localStorage.getItem(CONNECTED_KEY) === "1";
 export const getStatus = () => status;
 export const onStatus = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
@@ -58,6 +70,7 @@ export async function connect() {
         token = { value: resp.access_token, exp: Date.now() + (resp.expires_in - 60) * 1000 };
         localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
         localStorage.setItem(CONNECTED_KEY, "1");
+        await fetchUser();
         try { await sync(); resolve(); } catch (e) { reject(e); }
       },
       error_callback: (e) => { setStatus(wasConnected() ? "expired" : "off", "No se completó el inicio de sesión"); reject(new Error(e?.message || "Ventana cerrada")); },
@@ -71,6 +84,7 @@ export function disconnect() {
   token = null; fileId = null;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(CONNECTED_KEY);
+  localStorage.removeItem(USER_KEY);
   setStatus("off", "Sin conectar");
 }
 
@@ -127,6 +141,7 @@ export async function sync() {
   syncing = (async () => {
     setStatus("busy", "Sincronizando…");
     try {
+      if (!getUser()) await fetchUser();
       const remote = await download();
       const merged = store.merge(store.get(), remote || {});
       if (JSON.stringify(merged) !== JSON.stringify(store.get())) store.replaceAll(merged, "sync");
