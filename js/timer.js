@@ -1,4 +1,4 @@
-// Temporizadores: descanso (cuenta atrás) y ejercicio (cronómetro con objetivo opcional).
+// Temporizadores: descanso (cuenta atrás), ejercicio (cronómetro con objetivo opcional) e intervalos de cardio.
 // Se basan en marcas de tiempo, así que siguen siendo exactos si la pantalla se bloquea.
 let audio = null;
 let wakeLock = null;
@@ -57,6 +57,10 @@ function ensureEl() {
     if (a === "minus") { cur.end -= 15000; cur.total = Math.max(1, cur.total - 15); }
     if (a === "plus") { cur.end += 15000; cur.total += 15; cur.beeped = false; }
     if (a === "skip" || a === "stop") stop(true);
+    if (a === "next" && cur?.mode === "int") {
+      const t = (Date.now() - cur.start) / 1000, p = cur.phases.find((x) => t < x.to);
+      if (p) { cur.start -= (p.to - t) * 1000; cur.onShift?.(cur.start); }
+    }
     if (a === "min") el.classList.toggle("mini");
     render();
   });
@@ -76,13 +80,32 @@ function render() {
     el.classList.toggle("done", left <= 0);
     if (left <= 0 && !cur.beeped) { cur.beeped = true; beep(); }
     if (left <= -20) stop(true);
+  } else if (cur.mode === "int") {
+    const t = (now - cur.start) / 1000;
+    const i = cur.phases.findIndex((p) => t < p.to);
+    if (i < 0) {
+      time.textContent = mmss(cur.total);
+      fg.style.strokeDasharray = "100 100";
+      sub.textContent = "¡Sesión completada!";
+      el.classList.add("done");
+      el.dataset.phase = "";
+      if (!cur.beeped) { cur.beeped = true; beep(3); }
+      return;
+    }
+    const p = cur.phases[i];
+    if (i !== cur.idx) { cur.idx = i; beep(p.tipo === "trabajo" ? 2 : 1); }
+    el.querySelector(".timer-label").textContent = `${cur.label} · ${p.label}`;
+    el.dataset.phase = p.tipo;
+    time.textContent = mmss(p.to - t);
+    fg.style.strokeDasharray = `${Math.min(100, ((t - p.from) / p.seg) * 100)} 100`;
+    sub.textContent = `${mmss(t)} de ${mmss(cur.total)}`;
   } else {
     const el2 = (now - cur.start) / 1000;
     if (cur.target) {
       const left = cur.target - el2;
       time.textContent = left > 0 ? mmss(left) : "+" + mmss(-left);
       fg.style.strokeDasharray = `${Math.max(0, Math.min(100, (el2 / cur.target) * 100))} 100`;
-      sub.textContent = left > 0 ? `Objetivo ${cur.target} s` : "¡Objetivo cumplido!";
+      sub.textContent = left > 0 ? `Objetivo ${cur.target >= 120 ? mmss(cur.target) : `${cur.target} s`}` : "¡Objetivo cumplido!";
       if (left <= 0 && !cur.beeped) { cur.beeped = true; beep(2); }
     } else {
       time.textContent = mmss(el2);
@@ -93,6 +116,7 @@ function render() {
 }
 
 function actions(mode) {
+  if (mode === "int") return `<button data-t="next" class="btn ghost">Saltar fase</button><button data-t="stop" class="btn primary">Terminar</button><button data-t="min" class="btn ghost icon" aria-label="Minimizar">▾</button>`;
   return mode === "rest"
     ? `<button data-t="minus" class="btn ghost">−15 s</button><button data-t="skip" class="btn primary">Saltar</button><button data-t="plus" class="btn ghost">+15 s</button><button data-t="min" class="btn ghost icon" aria-label="Minimizar">▾</button>`
     : `<button data-t="stop" class="btn primary">Parar</button><button data-t="min" class="btn ghost icon" aria-label="Minimizar">▾</button>`;
@@ -105,15 +129,26 @@ export function startRest(seconds, label = "Descanso", restore) {
   open();
   return cur;
 }
-export function startWork({ target = 0, label = "Ejercicio", onStop } = {}) {
+export function startWork({ target = 0, label = "Ejercicio", onStop, start = Date.now() } = {}) {
   stop(false);
   ensureEl();
-  cur = { mode: "work", start: Date.now(), target, label, onStop };
+  cur = { mode: "work", start, target, label, onStop };
+  open();
+}
+// Intervalos: fases { tipo: calentamiento|trabajo|pausa|calma, seg, label } con aviso sonoro en cada cambio.
+export function startIntervals({ phases, label = "Intervalos", onStop, onShift, start = Date.now() }) {
+  stop(false);
+  ensureEl();
+  let acc = 0;
+  const ph = phases.map((p) => ({ ...p, from: acc, to: (acc += p.seg) }));
+  const t0 = (Date.now() - start) / 1000;
+  cur = { mode: "int", start, phases: ph, total: acc, label, onStop, onShift, idx: Math.max(0, ph.findIndex((p) => t0 < p.to)) };
   open();
 }
 function open() {
   el.querySelector(".timer-actions").innerHTML = actions(cur.mode);
   el.classList.remove("done", "mini");
+  el.dataset.phase = "";
   el.classList.add("open");
   lockScreen();
   clearInterval(tickId);
@@ -126,7 +161,7 @@ export function stop(user) {
   cur = null;
   clearInterval(tickId);
   el?.classList.remove("open");
-  if (c.mode === "work" && user && c.onStop) c.onStop(Math.round((Date.now() - c.start) / 1000));
+  if (c.mode !== "rest" && user && c.onStop) c.onStop(Math.min(c.total || Infinity, Math.round((Date.now() - c.start) / 1000)));
   if (onChange) onChange(null);
 }
 export const current = () => cur;

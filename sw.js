@@ -1,6 +1,6 @@
 // Service worker: guarda la app para usarla sin conexión en el gimnasio.
-const CACHE = "gymapp-v6";
-const FILES = ["./", "index.html", "css/styles.css", "js/app.js", "js/anim.js", "js/exercises.js", "js/program.js", "js/store.js", "js/drive.js", "js/timer.js", "js/theme.js", "js/config.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
+const CACHE = "gymapp-v7";
+const FILES = ["./", "index.html", "css/styles.css", "js/app.js", "js/cardio.js", "js/anim.js", "js/exercises.js", "js/program.js", "js/store.js", "js/drive.js", "js/timer.js", "js/theme.js", "js/config.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

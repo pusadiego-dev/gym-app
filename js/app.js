@@ -5,6 +5,7 @@ import * as store from "./store.js";
 import * as drive from "./drive.js";
 import * as timer from "./timer.js";
 import * as theme from "./theme.js";
+import { CARDIO, cardioById, CARDIO_MODES, isInterval, intervalMinutes, intervalPhases, hrRange } from "./cardio.js";
 
 const { fmt, e1rm } = P;
 const $ = (s, r = document) => r.querySelector(s);
@@ -17,8 +18,26 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
-const APP_VERSION = "6";
+const APP_VERSION = "7";
+const cardioName = (c) => cardioById[c.cardioId]?.nombre || c.cardioId;
+const cardioLine = (c) => `${cardioName(c)} · ${CARDIO_MODES[c.modo]?.corto || ""} · ${c.min} min`;
+const dayCardio = (d) => d.cardio || [];
+const sessCardio = (s) => s.cardio || [];
+const cardioMinOf = (s) => sessCardio(s).reduce((n, c) => n + (+c.min || 0), 0);
 const EMOJIS = ["🏆", "💪", "🔥", "🥇", "🎯", "🚀", "⭐", "🏋️", "🦵", "🫀", "⚡", "👑"];
+
+// ---------- sin zoom ----------
+// iOS ignora user-scalable=no, así que bloqueamos el pellizco, el doble toque y Ctrl + rueda/teclas.
+for (const ev of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+document.addEventListener("touchmove", (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener("touchend", (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd < 350 && !e.target.closest("input, textarea, select")) { e.preventDefault(); e.target.closest("button, a, label, summary, [data-act]")?.click(); }
+  lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener("wheel", (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && ["+", "-", "=", "0"].includes(e.key)) e.preventDefault(); });
 
 // ---------- utilidades de UI ----------
 function toast(msg) {
@@ -50,6 +69,7 @@ function mountAnims(root) {
     const [id, v] = svg.dataset.anim.split(":");
     mountAnim(svg, variant(id, +v).anim);
   });
+  root.querySelectorAll("svg[data-canim]").forEach((svg) => { const c = cardioById[svg.dataset.canim]; if (c) mountAnim(svg, c.anim); });
 }
 
 // ---------- historial y métricas ----------
@@ -84,6 +104,16 @@ function historyFor(exId) {
   }
   return pts;
 }
+function lastCardioFor(cardioId) {
+  for (const s of sessions()) {
+    const c = sessCardio(s).find((x) => x.cardioId === cardioId);
+    if (c) return { ...c, fecha: s.fecha };
+  }
+  return null;
+}
+function cardioMinutesSince(t) {
+  return store.live("sessions").filter((s) => new Date(s.fecha).getTime() >= t).reduce((n, s) => n + cardioMinOf(s), 0);
+}
 function weekSetsByMuscle(since = weekStart()) {
   const out = {};
   for (const s of store.live("sessions")) {
@@ -106,6 +136,10 @@ function goalProgress(g) {
     const n = store.live("sessions").filter((s) => s.fecha >= (g.creado || "")).length;
     return { pct: n / g.valor, txt: `${n} de ${g.valor} entrenamientos` };
   }
+  if (g.tipo === "cardio") {
+    const n = store.live("sessions").filter((s) => s.fecha >= (g.creado || "")).reduce((m, s) => m + cardioMinOf(s), 0);
+    return { pct: n / g.valor, txt: `${n} de ${g.valor} min de cardio` };
+  }
   if (g.tipo === "peso_corporal") {
     const bw = store.live("bodyweight").sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
     const start = g.inicio || bw?.kg || g.valor;
@@ -118,6 +152,7 @@ function goalProgress(g) {
 function goalTitle(g) {
   if (g.tipo === "ejercicio") return `${byId[g.exId]?.nombre || g.exId}: ${fmt(g.valor)} kg${g.reps > 1 ? ` × ${g.reps}` : ""}`;
   if (g.tipo === "sesiones") return `Completar ${g.valor} entrenamientos`;
+  if (g.tipo === "cardio") return `Acumular ${g.valor} min de cardio`;
   if (g.tipo === "peso_corporal") return `Llegar a ${fmt(g.valor)} kg de peso corporal`;
   return g.texto;
 }
@@ -186,16 +221,16 @@ function barsVsTarget(done, target) {
 // ---------- vistas ----------
 const routes = {
   hoy: viewHome, rutina: viewRoutine, ejercicios: viewExercises, ejercicio: viewExercise, progreso: viewProgress,
-  logros: viewAchievements, perfil: viewProfile, formulario: viewForm, entreno: viewWorkout,
+  logros: viewAchievements, perfil: viewProfile, formulario: viewForm, entreno: viewWorkout, cardio: viewCardio,
 };
 
 function render() {
   const [route, ...args] = (location.hash.slice(2) || "hoy").split("/");
   const profile = store.obj("profile");
-  if (!profile && !["formulario", "ejercicios", "ejercicio", "perfil"].includes(route)) { location.hash = "#/formulario"; return; }
+  if (!profile && !["formulario", "ejercicios", "ejercicio", "cardio", "perfil"].includes(route)) { location.hash = "#/formulario"; return; }
   if (route === "entreno" && !store.getActive()) { location.hash = "#/hoy"; return; }
   const fn = routes[route] || viewHome;
-  document.querySelectorAll(".tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.r === route || (route === "ejercicio" && a.dataset.r === "ejercicios")));
+  document.querySelectorAll(".tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.r === route || (["ejercicio", "cardio"].includes(route) && a.dataset.r === "ejercicios")));
   document.body.dataset.route = route;
   view.innerHTML = fn(...args.map(decodeURIComponent));
   mountAnims(view);
@@ -237,8 +272,8 @@ function viewHome() {
   <section class="card next">
     <p class="eyebrow">Toca hoy</p>
     <h2>${esc(r.dias[next].nombre)}</h2>
-    <p class="muted small">${r.dias[next].ejercicios.length} ejercicios · ~${Math.round(P.sessionSeconds(r.dias[next]) / 60)} min</p>
-    <ul class="mini-list">${r.dias[next].ejercicios.map((e) => `<li>${esc(exName(e.exId, e.variante))} <span class="muted">${e.series}×${e.tiempo ? `${e.repMin}-${e.repMax} s` : `${e.repMin}-${e.repMax}`}</span></li>`).join("")}</ul>
+    <p class="muted small">${[r.dias[next].ejercicios.length && `${r.dias[next].ejercicios.length} ejercicios`, dayCardio(r.dias[next]).length && "cardio"].filter(Boolean).join(" + ")} · ~${Math.round(P.sessionSeconds(r.dias[next]) / 60)} min</p>
+    <ul class="mini-list">${r.dias[next].ejercicios.map((e) => `<li>${esc(exName(e.exId, e.variante))} <span class="muted">${e.series}×${e.tiempo ? `${e.repMin}-${e.repMax} s` : `${e.repMin}-${e.repMax}`}</span></li>`).join("")}${dayCardio(r.dias[next]).map((c) => `<li>${esc(cardioName(c))} <span class="muted">${esc(CARDIO_MODES[c.modo]?.corto)} · ${c.min} min</span></li>`).join("")}</ul>
     <button class="btn primary block" data-act="start" data-day="${next}" ${active ? "disabled" : ""}>Empezar entreno</button>
   </section>
   <section><h3>Otros días</h3><div class="chips">${r.dias.map((d, i) => i === next ? "" : `<button class="chip" data-act="start" data-day="${i}" ${active ? "disabled" : ""}>${esc(d.nombre)}</button>`).join("")}</div></section>` : `<a class="btn primary block" href="#/formulario">Crear mi rutina</a>`}
@@ -248,14 +283,17 @@ function viewHome() {
 function sessionCard(s) {
   const sets = s.ejercicios.reduce((n, e) => n + e.sets.filter((x) => x.hecho).length, 0);
   const vol = s.ejercicios.reduce((n, e) => n + e.sets.filter((x) => x.hecho).reduce((m, x) => m + (+x.peso || 0) * (+x.reps || 0), 0), 0);
-  return `<button class="card session" data-act="showSession" data-id="${s.id}"><b>${esc(s.diaNombre)}</b><span class="muted small">${fmtDate(s.fecha, { weekday: "short", day: "numeric", month: "short" })} · ${Math.round((s.duracionSeg || 0) / 60)} min · ${sets} series · ${Math.round(vol).toLocaleString("es-ES")} kg</span></button>`;
+  const cmin = cardioMinOf(s);
+  const parts = [fmtDate(s.fecha, { weekday: "short", day: "numeric", month: "short" }), `${Math.round((s.duracionSeg || 0) / 60)} min`, sets && `${sets} series`, vol && `${Math.round(vol).toLocaleString("es-ES")} kg`, cmin && `${cmin} min de cardio`].filter(Boolean);
+  return `<button class="card session" data-act="showSession" data-id="${s.id}"><b>${esc(s.diaNombre)}</b><span class="muted small">${parts.join(" · ")}</span></button>`;
 }
 
 // FORMULARIO DE PERFIL
 function viewForm() {
   const g = drive.getUser();
   const isNew = !store.obj("profile");
-  const p = store.obj("profile") || { nombre: g?.nombre || "", avatar: g?.foto || null, experiencia: "principiante", objetivo: "hipertrofia", dias: 3, duracion: 60, equipo: "completo", limitaciones: [], prioridades: [] };
+  const p = store.obj("profile") || { nombre: g?.nombre || "", avatar: g?.foto || null, experiencia: "principiante", objetivo: "hipertrofia", cardioEnfoque: "complemento", cardioTipos: ["bici", "cinta_caminar"], dias: 3, duracion: 60, equipo: "completo", limitaciones: [], prioridades: [] };
+  const focus = P.cardioFocus(p);
   if (isNew && pendingAvatar === undefined && g?.foto) pendingAvatar = g.foto;
   const googleBox = !isNew ? "" : g
     ? `<p class="card small google-ok">Conectado con Google como <b>${esc(g.email)}</b>. Hemos rellenado tu nombre y tu foto; completa el resto.</p>`
@@ -279,22 +317,27 @@ function viewForm() {
     </fieldset>
     <fieldset><legend>Experiencia</legend>${radio("experiencia", Object.entries(P.LEVELS).map(([k, v]) => [k, v.label, v.desc]), p.experiencia)}</fieldset>
     <fieldset><legend>Objetivo principal</legend>${radio("objetivo", Object.entries(P.GOALS).map(([k, v]) => [k, v.label]), p.objetivo)}</fieldset>
+    <fieldset><legend>Cardio</legend>${radio("cardioEnfoque", Object.entries(P.CARDIO_FOCUS).map(([k, v]) => [k, v.label, v.desc]), focus)}
+      <div data-cardio ${focus === "ninguno" ? "hidden" : ""}><p class="small muted">¿Qué cardio te gusta o tienes disponible? <small>(si no eliges ninguno, usaremos bici y elíptica)</small></p>
+      <div class="chips">${CARDIO.map((c) => `<label class="chip-check"><input type="checkbox" name="cardioTipos" value="${c.id}" ${(p.cardioTipos || []).includes(c.id) ? "checked" : ""}><span>${esc(c.nombre)}</span></label>`).join("")}</div></div>
+    </fieldset>
     <fieldset><legend>Disponibilidad</legend>
       <label>Días por semana<select name="dias">${[2, 3, 4, 5, 6].map((d) => `<option ${+p.dias === d ? "selected" : ""}>${d}</option>`).join("")}</select></label>
       <label>Tiempo por sesión<select name="duracion">${[45, 60, 75, 90].map((d) => `<option value="${d}" ${+p.duracion === d ? "selected" : ""}>${d} min</option>`).join("")}</select></label>
     </fieldset>
-    <fieldset><legend>Material preferido</legend>${radio("equipo", [["completo", "Peso libre primero", "Barras y mancuernas, con máquinas de apoyo"], ["maquinas", "Máquinas y poleas primero", "Más guiado y fácil de aprender"]], p.equipo)}</fieldset>
+    <fieldset data-strength ${focus === "solo" ? "hidden" : ""}><legend>Material preferido</legend>${radio("equipo", [["completo", "Peso libre primero", "Barras y mancuernas, con máquinas de apoyo"], ["maquinas", "Máquinas y poleas primero", "Más guiado y fácil de aprender"]], p.equipo)}</fieldset>
     <fieldset><legend>Molestias o lesiones</legend><div class="chips">${check("limitaciones", [["lumbar", "Zona lumbar"], ["rodilla", "Rodillas"], ["hombro", "Hombros"]], p.limitaciones || [])}</div></fieldset>
-    <fieldset><legend>Músculos a priorizar <small class="muted">(+4 series/semana)</small></legend><div class="chips">${check("prioridades", Object.entries(MUSCLES), p.prioridades || [])}</div></fieldset>
+    <fieldset data-strength ${focus === "solo" ? "hidden" : ""}><legend>Músculos a priorizar <small class="muted">(+4 series/semana)</small></legend><div class="chips">${check("prioridades", Object.entries(MUSCLES), p.prioridades || [])}</div></fieldset>
     <button class="btn primary block" type="submit">${store.obj("routine") ? "Guardar y regenerar rutina" : "Generar mi rutina"}</button>
     ${store.obj("profile") ? `<button class="btn ghost block" type="button" data-act="saveProfileOnly">Guardar sin cambiar la rutina</button>` : ""}
   </form>`;
 }
 function readForm(form) {
   const fd = new FormData(form);
-  const o = Object.fromEntries([...fd.entries()].filter(([k]) => !["limitaciones", "prioridades"].includes(k)));
+  const o = Object.fromEntries([...fd.entries()].filter(([k]) => !["limitaciones", "prioridades", "cardioTipos"].includes(k)));
   o.limitaciones = fd.getAll("limitaciones");
   o.prioridades = fd.getAll("prioridades");
+  o.cardioTipos = fd.getAll("cardioTipos");
   if (pendingAvatar !== undefined) o.avatar = pendingAvatar;
   pendingAvatar = undefined;
   return o;
@@ -305,19 +348,25 @@ function viewRoutine() {
   const r = store.obj("routine"), p = store.obj("profile");
   if (!r) return `<p>No hay rutina. <a href="#/formulario">Créala</a>.</p>`;
   const vol = P.weeklySetsByMuscle(r);
+  const hasStrength = r.dias.some((d) => d.ejercicios.length);
+  const cmin = P.weeklyCardioMin(r), cequiv = Math.round(P.weeklyCardioEquiv(r));
   return `
-  <header class="page-h"><p class="eyebrow">Tu rutina</p><h1>${esc(r.nombre)}</h1><p class="muted">${r.dias.length} días por semana · ${esc(P.GOALS[p.objetivo]?.label || "")}</p></header>
+  <header class="page-h"><p class="eyebrow">Tu rutina</p><h1>${esc(r.nombre)}</h1><p class="muted">${r.dias.length} días por semana · ${esc(P.GOALS[p.objetivo]?.label || "")}${P.cardioFocus(p) !== "ninguno" ? ` · ${esc(P.CARDIO_FOCUS[P.cardioFocus(p)].label)}` : ""}</p></header>
   <details class="card why"><summary>¿Por qué esta rutina? (base científica)</summary><ul>${P.rationale(p, r).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
     <p class="small muted"><a href="#/perfil">Ver referencias</a></p></details>
   ${r.dias.map((d, di) => `
     <section class="card day">
       <div class="day-h"><h2>${esc(d.nombre)}</h2><span class="muted small">~${Math.round(P.sessionSeconds(d) / 60)} min</span></div>
       ${d.ejercicios.map((e, ei) => routineRow(e, di, ei)).join("")}
-      <div class="day-actions"><button class="btn ghost small" data-act="addEx" data-day="${di}">+ Añadir ejercicio</button><button class="btn primary small" data-act="start" data-day="${di}" ${store.getActive() ? "disabled" : ""}>Empezar</button></div>
+      ${dayCardio(d).map((c, ci) => cardioRow(c, di, ci)).join("")}
+      <div class="day-actions"><button class="btn ghost small" data-act="addEx" data-day="${di}">+ Ejercicio</button><button class="btn ghost small" data-act="addCardio" data-day="${di}">+ Cardio</button><button class="btn primary small" data-act="start" data-day="${di}" ${store.getActive() ? "disabled" : ""}>Empezar</button></div>
     </section>`).join("")}
-  <section class="card"><h3>Series semanales por músculo</h3>
+  ${cmin ? `<section class="card"><h3>Cardio semanal</h3>
+    <div class="progress"><span style="width:${Math.min(100, (cequiv / 150) * 100)}%"></span></div>
+    <p class="small"><b>${cmin} min</b> por semana${cequiv !== cmin ? ` (≈${cequiv} min moderados)` : ""}. Recomendación de salud: 150-300 min moderados (OMS, 2020).</p></section>` : ""}
+  ${hasStrength ? `<section class="card"><h3>Series semanales por músculo</h3>
     <div class="vol">${Object.keys(MUSCLES).map((m) => `<div><span>${MUSCLES[m]}</span><b class="${(vol[m] || 0) < 8 && !["core", "gemelos", "biceps", "triceps"].includes(m) ? "low" : ""}">${vol[m] || 0}</b></div>`).join("")}</div>
-    <p class="muted small">Referencia: unas 10 o más series semanales por músculo grande maximizan la hipertrofia en la mayoría de personas (Schoenfeld et al., 2017). Bíceps, tríceps y hombros reciben además trabajo indirecto de los básicos.</p></section>
+    <p class="muted small">Referencia: unas 10 o más series semanales por músculo grande maximizan la hipertrofia en la mayoría de personas (Schoenfeld et al., 2017). Bíceps, tríceps y hombros reciben además trabajo indirecto de los básicos.</p></section>` : ""}
   <a class="btn ghost block" href="#/formulario">Cambiar perfil y regenerar</a>`;
 }
 function routineRow(e, di, ei) {
@@ -340,19 +389,49 @@ function routineRow(e, di, ei) {
   </div>`;
 }
 
+function cardioRow(c, di, ci) {
+  const a = cardioById[c.cardioId], interval = isInterval(c.modo);
+  return `<div class="ex-row cardio-row">
+    <svg class="thumb" data-canim="${c.cardioId}" viewBox="0 0 200 200"></svg>
+    <div class="ex-main">
+      <a href="#/cardio/${c.cardioId}" class="ex-name">${esc(a?.nombre || c.cardioId)}</a>
+      <span class="muted small">Cardio · RPE ${CARDIO_MODES[c.modo].rpe}${hrRange(c.modo, store.obj("profile")?.edad) ? ` · ${hrRange(c.modo, store.obj("profile").edad)}` : ""}</span>
+      <div class="ex-params">
+        <select data-edit-cardio="modo" data-day="${di}" data-i="${ci}" aria-label="Tipo de sesión">${Object.entries(CARDIO_MODES).map(([k, m]) => `<option value="${k}" ${k === c.modo ? "selected" : ""}>${m.nombre}</option>`).join("")}</select>
+        <label><input type="number" inputmode="numeric" min="5" max="240" step="5" value="${c.min}" data-edit-cardio="min" data-day="${di}" data-i="${ci}" aria-label="Minutos" ${interval ? "disabled" : ""}> min</label>
+      </div>
+    </div>
+    <div class="ex-tools"><button class="icon-btn" data-act="cardioMenu" data-day="${di}" data-i="${ci}" aria-label="Opciones">⋯</button></div>
+  </div>`;
+}
+function pickCardio(cb) {
+  const lim = store.obj("profile")?.limitaciones || [];
+  modal(`<h2>Elegir cardio</h2><div class="opt-list">${CARDIO.map((c) => `<button class="opt-btn" data-pickc="${c.id}">${cardioThumb(c)}<span><b>${esc(c.nombre)}</b><small>${esc(c.sub)}${c.avoid.some((x) => lim.includes(x)) ? " · ⚠️ ojo con tus molestias" : ""}</small></span></button>`).join("")}</div>`, (m) => {
+    m.querySelector(".opt-list").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-pickc]");
+      if (!b) return;
+      closeModal();
+      cb(cardioById[b.dataset.pickc]);
+    });
+  });
+}
+const cardioThumb = (c) => `<svg class="thumb" viewBox="0 0 200 200" aria-hidden="true">${frameSvg(c.anim, 0.2)}</svg>`;
+
 // EJERCICIOS
 let exFilter = { m: "", t: "", q: "" };
 function viewExercises() {
-  const list = EXERCISES.filter((e) => (!exFilter.m || e.musculo === exFilter.m) && (!exFilter.t || e.variantes.some((v) => v.tipo === exFilter.t)) && (!exFilter.q || (e.nombre + e.variantes.map((v) => v.nombre).join(" ")).toLowerCase().includes(exFilter.q.toLowerCase())));
+  const cardioOnly = exFilter.m === "cardio";
+  const clist = exFilter.t || (exFilter.m && !cardioOnly) ? [] : CARDIO.filter((c) => !exFilter.q || (c.nombre + " " + c.sub + " cardio").toLowerCase().includes(exFilter.q.toLowerCase()));
+  const list = cardioOnly ? [] : EXERCISES.filter((e) => (!exFilter.m || e.musculo === exFilter.m) && (!exFilter.t || e.variantes.some((v) => v.tipo === exFilter.t)) && (!exFilter.q || (e.nombre + e.variantes.map((v) => v.nombre).join(" ")).toLowerCase().includes(exFilter.q.toLowerCase())));
   return `
-  <header class="page-h"><h1>Ejercicios</h1><p class="muted">${EXERCISES.length} ejercicios y ${EXERCISES.reduce((n, e) => n + e.variantes.length, 0)} variantes con su técnica animada.</p></header>
+  <header class="page-h"><h1>Ejercicios</h1><p class="muted">${EXERCISES.length} ejercicios con ${EXERCISES.reduce((n, e) => n + e.variantes.length, 0)} variantes y ${CARDIO.length} actividades de cardio, con su técnica animada.</p></header>
   <input class="search" type="search" placeholder="Buscar ejercicio…" value="${esc(exFilter.q)}" data-filter="q">
-  <div class="chips scroll">${[["", "Todos"], ...Object.entries(MUSCLES)].map(([k, l]) => `<button class="chip ${exFilter.m === k ? "on" : ""}" data-act="filterM" data-v="${k}">${l}</button>`).join("")}</div>
+  <div class="chips scroll">${[["", "Todos"], ["cardio", "Cardio"], ...Object.entries(MUSCLES)].map(([k, l]) => `<button class="chip ${exFilter.m === k ? "on" : ""}" data-act="filterM" data-v="${k}">${l}</button>`).join("")}</div>
   <div class="chips">${[["", "Todo el material"], ...Object.entries(VARIANT_LABEL)].map(([k, l]) => `<button class="chip ${exFilter.t === k ? "on" : ""}" data-act="filterT" data-v="${k}">${l}</button>`).join("")}</div>
   <div class="ex-grid">${list.map((e) => {
     const vi = exFilter.t ? Math.max(0, e.variantes.findIndex((v) => v.tipo === exFilter.t)) : 0;
     return `<a class="ex-card" href="#/ejercicio/${e.id}/${vi}">${animSvg(e.variantes[vi].anim, "thumb")}<b>${esc(e.nombre)}</b><span class="muted small">${MUSCLES[e.musculo]} · ${[...new Set(e.variantes.map((v) => VARIANT_LABEL[v.tipo]))].join(", ")}</span></a>`;
-  }).join("") || `<p class="muted">Sin resultados.</p>`}</div>`;
+  }).join("")}${clist.map((c) => `<a class="ex-card" href="#/cardio/${c.id}">${cardioThumb(c)}<b>${esc(c.nombre)}</b><span class="muted small">Cardio · ${esc(c.sub)}</span></a>`).join("")}${list.length || clist.length ? "" : `<p class="muted">Sin resultados.</p>`}</div>`;
 }
 function viewExercise(id, v = "0") {
   const ex = byId[id];
@@ -371,6 +450,25 @@ function viewExercise(id, v = "0") {
   <section class="card"><h3>Tu evolución</h3>${best ? `<p>Mejor 1RM estimado: <b>${fmt(best)} kg</b></p>` : ""}${lineChart(hist, { unit: hist[0]?.secs ? "s" : "kg", label: `Evolución de ${ex.nombre}` })}</section>`;
 }
 
+function viewCardio(id) {
+  const c = cardioById[id];
+  if (!c) return `<p>Actividad no encontrada.</p>`;
+  const edad = store.obj("profile")?.edad;
+  const hist = [...sessions()].reverse().flatMap((s) => sessCardio(s).filter((x) => x.cardioId === id).map((x) => ({ x: new Date(s.fecha).getTime(), y: +x.min || 0, km: +x.km || 0 })));
+  const kmPts = hist.filter((h) => h.km).map((h) => ({ x: h.x, y: h.km }));
+  return `
+  <a class="back" href="#/ejercicios">← Ejercicios</a>
+  <header class="page-h"><p class="eyebrow">Cardio · impacto ${c.impacto}</p><h1>${esc(c.nombre)}</h1><p class="muted">${esc(c.sub)}</p></header>
+  <div class="anim-stage"><svg class="anim big" data-canim="${id}" role="img" aria-label="Animación: ${esc(c.nombre)}"></svg></div>
+  <section class="card"><h3>Cómo se hace</h3><ol class="steps">${c.pasos.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></section>
+  <section class="card warn"><h3>Errores comunes</h3><ul>${c.errores.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></section>
+  <section class="card tip-card"><h3>Consejo</h3><p>${esc(c.consejo)}</p></section>
+  <section class="card"><h3>Intensidades</h3><ul class="plain modes">${Object.values(CARDIO_MODES).map((m, i) => `<li><b>${esc(m.nombre)}</b><span class="small">RPE ${m.rpe}/10${hrRange(Object.keys(CARDIO_MODES)[i], edad) ? ` · ${hrRange(Object.keys(CARDIO_MODES)[i], edad)}` : ""} · ${esc(m.desc)}</span></li>`).join("")}</ul>
+    <p class="muted small">RPE: esfuerzo percibido de 1 (nada) a 10 (máximo).${edad ? "" : " Indica tu edad en el perfil para ver tus pulsaciones."}</p></section>
+  <section class="card"><h3>Tu evolución</h3><p class="muted small">Minutos por sesión</p>${lineChart(hist, { unit: "min", label: `Minutos de ${c.nombre}` })}
+    ${c.distancia && kmPts.length ? `<p class="muted small">Distancia por sesión</p>${lineChart(kmPts, { unit: "km", label: `Distancia de ${c.nombre}` })}` : ""}</section>`;
+}
+
 // ENTRENO ACTIVO
 function startWorkout(di) {
   const r = store.obj("routine");
@@ -384,21 +482,26 @@ function startWorkout(di) {
       const peso = sug?.peso ?? (lastW || "");
       return { exId: slot.exId, variante: slot.variante, slot: { ...slot }, sets: Array.from({ length: slot.series }, () => ({ peso: peso === 0 ? "" : peso, reps: "", seg: "", hecho: false })) };
     }),
+    cardio: dayCardio(d).map(newCardioEntry),
   };
   store.setActive(act);
   timer.unlockAudio();
   location.hash = "#/entreno";
 }
+const newCardioEntry = (c) => ({ cardioId: c.cardioId, modo: c.modo, min: c.min, real: { min: "", km: "", rpe: "", fc: "" }, hecho: false });
 function viewWorkout() {
   const a = store.getActive();
-  const total = a.ejercicios.reduce((n, e) => n + e.sets.length, 0);
-  const done = a.ejercicios.reduce((n, e) => n + e.sets.filter((s) => s.hecho).length, 0);
+  const cardio = a.cardio || [];
+  const total = a.ejercicios.reduce((n, e) => n + e.sets.length, 0) + cardio.length;
+  const done = a.ejercicios.reduce((n, e) => n + e.sets.filter((s) => s.hecho).length, 0) + cardio.filter((c) => c.hecho).length;
+  const unit = a.ejercicios.length ? (cardio.length ? "hecho" : "series") : "bloques";
   return `
-  <header class="page-h workout-h"><div><p class="eyebrow">Entrenando</p><h1>${esc(a.diaNombre)}</h1></div><div class="clock"><span id="elapsed">${timer.mmss((Date.now() - a.inicio) / 1000)}</span><small>${done}/${total} series</small></div></header>
-  <div class="progress"><span style="width:${(done / total) * 100}%"></span></div>
+  <header class="page-h workout-h"><div><p class="eyebrow">Entrenando</p><h1>${esc(a.diaNombre)}</h1></div><div class="clock"><span id="elapsed">${timer.mmss((Date.now() - a.inicio) / 1000)}</span><small>${done}/${total} ${unit}</small></div></header>
+  <div class="progress"><span style="width:${total ? (done / total) * 100 : 0}%"></span></div>
   <div class="row-btns"><button class="btn ghost small" data-act="stopwatch">⏱ Cronómetro</button><button class="btn ghost small" data-act="restNow">⏸ Descanso</button></div>
   ${a.ejercicios.map((e, ei) => workoutExercise(e, ei)).join("")}
-  <button class="btn ghost block" data-act="addWorkoutEx">+ Añadir ejercicio</button>
+  ${cardio.map((c, ci) => workoutCardio(c, ci)).join("")}
+  <div class="row-btns"><button class="btn ghost small" data-act="addWorkoutEx">+ Ejercicio</button><button class="btn ghost small" data-act="addWorkoutCardio">+ Cardio</button></div>
   <button class="btn primary block" data-act="finish">Terminar entreno</button>
   <button class="btn danger-ghost block" data-act="discard">Descartar entreno</button>`;
 }
@@ -430,6 +533,36 @@ function workoutExercise(e, ei) {
     <div class="set-tools"><button class="btn ghost small" data-act="addSet" data-e="${ei}">+ Serie</button>${e.sets.length > 1 ? `<button class="btn ghost small" data-act="delSet" data-e="${ei}">− Serie</button>` : ""}</div>
   </section>`;
 }
+function workoutCardio(c, ci) {
+  const a = cardioById[c.cardioId], m = CARDIO_MODES[c.modo], p = store.obj("profile");
+  const last = lastCardioFor(c.cardioId);
+  const running = store.getActive().cardioRun?.ci === ci && timer.current();
+  const hr = hrRange(c.modo, p?.edad);
+  return `<section class="card wex cardio-wex ${c.hecho ? "complete" : ""}" id="wcardio-${ci}">
+    <div class="wex-h">
+      <svg class="thumb" data-canim="${c.cardioId}" viewBox="0 0 200 200" data-act="cardioTechnique" data-id="${c.cardioId}" role="button" aria-label="Ver técnica"></svg>
+      <div><b>${esc(a?.nombre || c.cardioId)}</b>
+      <p class="muted small">${esc(m.nombre)} · ${c.min} min · RPE ${m.rpe}${hr ? ` · ${hr}` : ""}</p></div>
+      <button class="icon-btn" data-act="wcardioRemove" data-i="${ci}" aria-label="Quitar de hoy">✕</button>
+    </div>
+    <p class="small">${esc(m.desc)}</p>
+    ${last ? `<p class="last small">Última vez (${fmtDate(last.fecha)}): ${[`${last.min} min`, last.km && `${fmt(last.km)} km`, last.rpe && `RPE ${last.rpe}`, last.fc && `${last.fc} ppm`].filter(Boolean).join(" · ")}</p>` : ""}
+    <button class="btn ${running ? "ghost" : "primary"} block small" data-act="cardioStart" data-i="${ci}">${running ? "Temporizador en marcha" : isInterval(c.modo) ? "▶ Empezar intervalos" : "▶ Empezar"}</button>
+    <div class="cardio-log">
+      <label>Min<input type="number" inputmode="numeric" min="0" max="600" placeholder="${c.min}" value="${esc(c.real.min)}" data-cset="min" data-c="${ci}"></label>
+      ${a?.distancia ? `<label>Km<input type="number" inputmode="decimal" step="0.01" min="0" max="300" placeholder="—" value="${esc(c.real.km)}" data-cset="km" data-c="${ci}"></label>` : ""}
+      <label>RPE<input type="number" inputmode="numeric" min="1" max="10" placeholder="${m.rpe}" value="${esc(c.real.rpe)}" data-cset="rpe" data-c="${ci}"></label>
+      <label>Pulso<input type="number" inputmode="numeric" min="40" max="230" placeholder="ppm" value="${esc(c.real.fc)}" data-cset="fc" data-c="${ci}"></label>
+      <button class="check" data-act="cardioDone" data-i="${ci}" aria-label="Cardio hecho" aria-pressed="${c.hecho}">✓</button>
+    </div>
+  </section>`;
+}
+function startCardioTimer(a, ci, start) {
+  const c = a.cardio[ci], label = cardioName(c);
+  const onStop = (secs) => updateActive((x) => { if (x.cardio[ci]) x.cardio[ci].real.min = Math.max(1, Math.round(secs / 60)); x.cardioRun = null; });
+  if (isInterval(c.modo)) timer.startIntervals({ phases: intervalPhases(c.modo), label, start, onStop, onShift: (st) => updateActive((x) => x.cardioRun && (x.cardioRun.start = st), false) });
+  else timer.startWork({ target: c.min * 60, label: `${label} · ${CARDIO_MODES[c.modo].corto}`, start, onStop });
+}
 function updateActive(fn, rerender = true) {
   const a = store.getActive();
   fn(a);
@@ -441,7 +574,8 @@ function finishWorkout() {
   const ejercicios = a.ejercicios
     .map((e) => ({ exId: e.exId, variante: e.variante, sets: e.sets.filter((s) => s.hecho).map((s) => ({ peso: +s.peso || 0, reps: +s.reps || 0, seg: +s.seg || 0, hecho: true })) }))
     .filter((e) => e.sets.length);
-  if (!ejercicios.length) { if (confirmBox("No has marcado ninguna serie. ¿Descartar el entreno?")) discardWorkout(); return; }
+  const cardio = (a.cardio || []).filter((c) => c.hecho).map((c) => ({ cardioId: c.cardioId, modo: c.modo, min: +c.real.min || c.min, km: +c.real.km || 0, rpe: +c.real.rpe || 0, fc: +c.real.fc || 0 }));
+  if (!ejercicios.length && !cardio.length) { if (confirmBox("No has marcado ninguna serie ni bloque de cardio. ¿Descartar el entreno?")) discardWorkout(); return; }
   const fecha = new Date(a.inicio).toISOString();
   const prs = [];
   for (const e of ejercicios) {
@@ -449,18 +583,22 @@ function finishWorkout() {
     const now = Math.max(...e.sets.map((s) => e1rm(s.peso, s.reps)));
     if (now > before && before > 0) prs.push({ exId: e.exId, before, now });
   }
-  store.upsert("sessions", { id: a.id, fecha, duracionSeg: Math.round((Date.now() - a.inicio) / 1000), diaIdx: a.diaIdx, diaNombre: a.diaNombre, rutinaId: a.rutinaId, ejercicios });
+  store.upsert("sessions", { id: a.id, fecha, duracionSeg: Math.round((Date.now() - a.inicio) / 1000), diaIdx: a.diaIdx, diaNombre: a.diaNombre, rutinaId: a.rutinaId, ejercicios, cardio });
   store.setActive(null);
   timer.stop(false);
   timer.releaseScreen();
   const goals = checkGoals();
+  // el resumen se abre después de cambiar de vista (al cambiar de vista se cierran los modales)
+  window.addEventListener("hashchange", () => summary(), { once: true });
   location.hash = "#/hoy";
-  const sets = ejercicios.reduce((n, e) => n + e.sets.length, 0);
+  const summary = () => {
+  const sets = ejercicios.reduce((n, e) => n + e.sets.length, 0), cmin = cardio.reduce((n, c) => n + c.min, 0);
   modal(`<h2>¡Entreno completado! 💪</h2>
-    <p>${sets} series en ${Math.round((Date.now() - a.inicio) / 60000)} min.</p>
+    <p>${[sets && `${sets} ${sets === 1 ? "serie" : "series"}`, cmin && `${cmin} min de cardio`].filter(Boolean).join(" y ")} en ${Math.round((Date.now() - a.inicio) / 60000)} min.</p>
     ${prs.length ? `<h3>Nuevos récords</h3><ul class="prs">${prs.map((p) => `<li>🏅 ${esc(byId[p.exId].nombre)}: ${fmt(p.now)} kg 1RM est. <span class="muted">(antes ${fmt(p.before)})</span></li>`).join("")}</ul>` : ""}
     ${goals.length ? `<h3>Objetivos conseguidos</h3><ul>${goals.map((g) => `<li>🎯 ${esc(goalTitle(g))}</li>`).join("")}</ul><a class="btn primary block" href="#/logros" data-act="closeModal">Añadir a mis logros</a>` : ""}
     <button class="btn ${goals.length ? "ghost" : "primary"} block" data-act="closeModal">Cerrar</button>`);
+  };
 }
 function discardWorkout() { store.setActive(null); timer.stop(false); timer.releaseScreen(); location.hash = "#/hoy"; }
 
@@ -476,19 +614,24 @@ function viewProgress() {
   const month = ss.filter((s) => Date.now() - new Date(s.fecha).getTime() < 30 * DAY);
   const vol = month.reduce((n, s) => n + s.ejercicios.reduce((m, e) => m + e.sets.reduce((k, x) => k + (+x.peso || 0) * (+x.reps || 0), 0), 0), 0);
   const records = used.map((id) => ({ id, v: bestE1rm(id) })).filter((x) => x.v).sort((a, b) => b.v - a.v);
+  const p = store.obj("profile"), focus = P.cardioFocus(p || {});
+  const cMonth = month.reduce((n, s) => n + cardioMinOf(s), 0);
+  const showCardio = focus !== "ninguno" || ss.some((s) => sessCardio(s).length);
   return `
   <header class="page-h"><h1>Tu evolución</h1></header>
   <div class="stats">
     <div class="stat"><span class="n">${month.length}</span><span>entrenos en 30 días</span></div>
-    <div class="stat"><span class="n">${(vol / 1000).toFixed(1).replace(".", ",")}<small>t</small></span><span>volumen en 30 días</span></div>
-    <div class="stat"><span class="n">${records.length}</span><span>ejercicios con marca</span></div>
+    ${focus === "solo" ? "" : `<div class="stat"><span class="n">${(vol / 1000).toFixed(1).replace(".", ",")}<small>t</small></span><span>volumen en 30 días</span></div>`}
+    ${showCardio ? `<div class="stat"><span class="n">${cMonth}<small>min</small></span><span>cardio en 30 días</span></div>` : ""}
+    ${focus === "solo" ? `<div class="stat"><span class="n">${fmt(month.reduce((n, s) => n + sessCardio(s).reduce((m, c) => m + (+c.km || 0), 0), 0))}<small>km</small></span><span>distancia en 30 días</span></div>` : showCardio ? "" : `<div class="stat"><span class="n">${records.length}</span><span>ejercicios con marca</span></div>`}
   </div>
-  <section class="card"><h3>Fuerza por ejercicio</h3>
+  ${showCardio ? cardioProgress(r) : ""}
+  ${focus === "solo" && !used.length ? "" : `<section class="card"><h3>Fuerza por ejercicio</h3>
     ${used.length ? `<select data-act-change="progEx">${used.map((id) => `<option value="${id}" ${id === progEx ? "selected" : ""}>${esc(byId[id]?.nombre || id)}</option>`).join("")}</select>
     <p class="muted small">1RM estimado (fórmula de Epley) de la mejor serie de cada sesión.</p>
     ${lineChart(historyFor(progEx), { unit: byId[progEx]?.tiempo ? "s" : "kg", label: "Evolución" })}` : `<p class="muted">Registra tu primer entreno para ver tu progreso.</p>`}
-  </section>
-  ${r ? `<section class="card"><h3>Series esta semana</h3>${barsVsTarget(weekSetsByMuscle(), target)}</section>` : ""}
+  </section>`}
+  ${r && Object.keys(target).length ? `<section class="card"><h3>Series esta semana</h3>${barsVsTarget(weekSetsByMuscle(), target)}</section>` : ""}
   <section class="card"><h3>Peso corporal</h3>
     <form class="inline-form" id="bwForm"><input name="kg" type="number" inputmode="decimal" step="0.1" min="30" max="300" placeholder="kg" required aria-label="Peso en kg"><input name="fecha" type="date" value="${today()}" aria-label="Fecha"><button class="btn primary small">Añadir</button></form>
     ${lineChart(bw.map((b) => ({ x: new Date(b.fecha).getTime(), y: +b.kg })), { unit: "kg", label: "Peso corporal" })}
@@ -496,6 +639,20 @@ function viewProgress() {
   </section>
   ${records.length ? `<section class="card"><h3>Mejores marcas</h3><ul class="plain records">${records.map((x) => `<li><a href="#/ejercicio/${x.id}/0">${esc(byId[x.id]?.nombre)}</a><b>${fmt(x.v)} kg</b></li>`).join("")}</ul></section>` : ""}
   <section><h3>Historial</h3>${ss.map(sessionCard).join("") || `<p class="muted">Sin entrenos todavía.</p>`}</section>`;
+}
+
+function cardioProgress(r) {
+  const goal = r ? P.weeklyCardioMin(r) : 0;
+  const wk = cardioMinutesSince(weekStart());
+  const weeks = Array.from({ length: 10 }, (_, i) => weekStart() - (9 - i) * 7 * DAY);
+  const pts = weeks.map((w) => ({ x: w, y: store.live("sessions").filter((s) => { const t = new Date(s.fecha).getTime(); return t >= w && t < w + 7 * DAY; }).reduce((n, s) => n + cardioMinOf(s), 0) }));
+  const first = pts.findIndex((x) => x.y > 0);
+  return `<section class="card"><h3>Cardio</h3>
+    <p>Esta semana: <b>${wk} min</b>${goal ? ` de ${goal} min de tu rutina` : ""}</p>
+    ${goal ? `<div class="progress"><span style="width:${Math.min(100, (wk / goal) * 100)}%"></span></div>` : ""}
+    <p class="muted small">Minutos de cardio por semana. La OMS recomienda 150-300 min moderados.</p>
+    ${lineChart(first < 0 ? [] : pts.slice(Math.max(0, Math.min(first, pts.length - 2))), { unit: "min", label: "Minutos de cardio por semana" })}
+  </section>`;
 }
 
 // LOGROS Y OBJETIVOS
@@ -529,15 +686,15 @@ function achForm(pre = {}) {
 function goalForm() {
   modal(`<h2>Nuevo objetivo</h2><form id="goalForm" class="form">
     <label>Tipo<select name="tipo" id="goalTipo">
-      <option value="ejercicio">Peso en un ejercicio (1RM estimado)</option><option value="sesiones">Número de entrenamientos</option><option value="peso_corporal">Peso corporal</option><option value="libre">Otro (lo marco yo)</option></select></label>
+      <option value="ejercicio">Peso en un ejercicio (1RM estimado)</option><option value="sesiones">Número de entrenamientos</option><option value="cardio">Minutos de cardio acumulados</option><option value="peso_corporal">Peso corporal</option><option value="libre">Otro (lo marco yo)</option></select></label>
     <label data-for="ejercicio">Ejercicio<select name="exId">${EXERCISES.filter((e) => !e.tiempo).map((e) => `<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
-    <label data-for="ejercicio sesiones peso_corporal"><span id="goalValLabel">Peso objetivo (kg)</span><input name="valor" type="number" inputmode="decimal" step="0.5" min="1"></label>
+    <label data-for="ejercicio sesiones cardio peso_corporal"><span id="goalValLabel">Peso objetivo (kg)</span><input name="valor" type="number" inputmode="decimal" step="0.5" min="1"></label>
     <label data-for="libre" hidden>Describe el objetivo<input name="texto" maxlength="120"></label>
     <button class="btn primary block">Guardar objetivo</button></form>`, (m) => {
     const sel = $("#goalTipo", m);
     const upd = () => {
       m.querySelectorAll("[data-for]").forEach((l) => (l.hidden = !l.dataset.for.split(" ").includes(sel.value)));
-      $("#goalValLabel", m).textContent = { ejercicio: "Peso objetivo (kg)", sesiones: "Número de entrenamientos", peso_corporal: "Peso objetivo (kg)" }[sel.value] || "";
+      $("#goalValLabel", m).textContent = { ejercicio: "Peso objetivo (kg)", sesiones: "Número de entrenamientos", cardio: "Minutos de cardio", peso_corporal: "Peso objetivo (kg)" }[sel.value] || "";
     };
     sel.addEventListener("change", upd); upd();
   });
@@ -552,7 +709,7 @@ function viewProfile() {
   ${p ? `<section class="card"><div class="profile-top">${avatarHtml(p, "lg")}<div><h3>${esc(p.nombre)}</h3>
       <div class="row-btns"><label class="btn ghost small">Cambiar foto<input type="file" accept="image/*" id="avatarFile" hidden></label>${p.avatar ? `<button class="btn danger-ghost small" data-act="removeAvatar">Quitar</button>` : ""}<a class="btn ghost small" href="#/formulario">Editar perfil</a></div></div></div>
     ${drive.getUser()?.email ? `<p class="muted small">${esc(drive.getUser().email)}</p>` : ""}<p class="muted small">${[p.edad && `${p.edad} años`, p.peso && `${fmt(+p.peso)} kg`, p.altura && `${p.altura} cm`].filter(Boolean).join(" · ")}</p>
-    <p>${P.LEVELS[p.experiencia]?.label} · ${P.GOALS[p.objetivo]?.label} · ${p.dias} días · ${p.duracion} min</p></section>` : `<a class="btn primary block" href="#/formulario">Crear perfil</a>`}
+    <p>${P.LEVELS[p.experiencia]?.label} · ${P.GOALS[p.objetivo]?.label} · ${P.CARDIO_FOCUS[P.cardioFocus(p)].label} · ${p.dias} días · ${p.duracion} min</p></section>` : `<a class="btn primary block" href="#/formulario">Crear perfil</a>`}
   ${drive.clientId() && !drive.getUser() && drive.getStatus().state !== "off" ? `<section class="card google-cta"><b>Usa tus datos de Google</b><p class="small muted">Vuelve a conectar para que la app pueda leer tu nombre, correo y foto.</p><button class="btn ghost block" data-act="driveConnect">Conectar con Google</button></section>` : ""}
   <section class="card sync-card"><h3>Sincronización con Google Drive</h3>
     <p class="muted small">Tus datos se guardan en este dispositivo y, si conectas Google, en una carpeta privada de tu Drive que solo ve esta app. Así los tienes en el iPhone, la tablet y el ordenador.</p>
@@ -610,6 +767,7 @@ const actions = {
     if (!s) return;
     modal(`<h2>${esc(s.diaNombre)}</h2><p class="muted">${fmtDate(s.fecha, { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${Math.round(s.duracionSeg / 60)} min</p>
       ${s.ejercicios.map((e) => `<div class="hist-ex"><b>${esc(exName(e.exId, e.variante))}</b><span>${e.sets.map((x) => (x.seg && !x.reps ? `${x.seg} s` : `${fmt(x.peso)}×${x.reps}`)).join(" · ")}</span></div>`).join("")}
+      ${sessCardio(s).map((c) => `<div class="hist-ex"><b>${esc(cardioName(c))}</b><span>${[CARDIO_MODES[c.modo]?.corto, `${c.min} min`, c.km && `${fmt(c.km)} km`, c.rpe && `RPE ${c.rpe}`, c.fc && `${c.fc} ppm`].filter(Boolean).join(" · ")}</span></div>`).join("")}
       <button class="btn danger-ghost block" data-act="delSession" data-id="${s.id}">Borrar este entreno</button>`);
   },
   delSession: (b) => { if (confirmBox("¿Borrar este entreno?")) { store.remove("sessions", b.dataset.id); closeModal(); render(); } },
@@ -646,6 +804,35 @@ const actions = {
     r.dias[+b.dataset.day].ejercicios.push({ exId: ex.id, variante: P.pickVariant(ex, p) ?? 0, series: 3, repMin: ex.tiempo ? 30 : comp ? 6 : 10, repMax: ex.tiempo ? 60 : comp ? 10 : 15, rir: 2, descanso: comp ? 150 : 90, tiempo: !!ex.tiempo });
   }, true)),
   technique: (b) => { location.hash = `#/ejercicio/${b.dataset.ex}/${b.dataset.v}`; },
+  cardioTechnique: (b) => { location.hash = `#/cardio/${b.dataset.id}`; },
+  addCardio: (b) => pickCardio((c) => editRoutine((r) => { const d = r.dias[+b.dataset.day]; (d.cardio ||= []).push({ cardioId: c.id, modo: "z2", min: 20 }); }, true)),
+  cardioMenu: (b) => {
+    const di = +b.dataset.day, ci = +b.dataset.i, c = store.obj("routine").dias[di].cardio[ci];
+    modal(`<h2>${esc(cardioName(c))}</h2><h3>Cambiar actividad</h3><div class="opt-list">${CARDIO.map((x) => `<button class="opt-btn ${x.id === c.cardioId ? "on" : ""}" data-act="setCardio" data-day="${di}" data-i="${ci}" data-id="${x.id}">${cardioThumb(x)}<span><b>${esc(x.nombre)}</b><small>${esc(x.sub)}</small></span></button>`).join("")}</div>
+      <div class="row-btns"><a class="btn ghost small" href="#/cardio/${c.cardioId}">Ver técnica</a><button class="btn danger-ghost small" data-act="removeCardio" data-day="${di}" data-i="${ci}">Quitar</button></div>`);
+  },
+  setCardio: (b) => editRoutine((r) => (r.dias[+b.dataset.day].cardio[+b.dataset.i].cardioId = b.dataset.id), true),
+  removeCardio: (b) => editRoutine((r) => r.dias[+b.dataset.day].cardio.splice(+b.dataset.i, 1), true),
+  addWorkoutCardio: () => pickCardio((c) => updateActive((a) => (a.cardio ||= []).push(newCardioEntry({ cardioId: c.id, modo: "z2", min: 20 })))),
+  wcardioRemove: (b) => {
+    if (!confirmBox("¿Quitar este cardio del entreno de hoy?")) return;
+    const ci = +b.dataset.i;
+    if (store.getActive().cardioRun?.ci === ci) timer.stop(false);
+    updateActive((a) => { a.cardio.splice(ci, 1); if (a.cardioRun) a.cardioRun = a.cardioRun.ci === ci ? null : { ...a.cardioRun, ci: a.cardioRun.ci > ci ? a.cardioRun.ci - 1 : a.cardioRun.ci }; });
+  },
+  cardioStart: (b) => {
+    timer.unlockAudio();
+    const ci = +b.dataset.i;
+    if (store.getActive().cardioRun?.ci === ci && timer.current()) return;
+    const start = Date.now();
+    startCardioTimer(store.getActive(), ci, start);
+    updateActive((a) => (a.cardioRun = { ci, start }));
+  },
+  cardioDone: (b) => updateActive((a) => {
+    const c = a.cardio[+b.dataset.i];
+    c.hecho = !c.hecho;
+    if (c.hecho && !c.real.min) c.real.min = c.min;
+  }),
   wexMenu: (b) => {
     const a = store.getActive(), ei = +b.dataset.i, e = a.ejercicios[ei], ex = byId[e.exId];
     modal(`<h2>${esc(ex.nombre)}</h2><h3>Variante para hoy</h3><div class="opt-list">${ex.variantes.map((v, i) => `<button class="opt-btn ${i === e.variante ? "on" : ""}" data-act="wexVariant" data-i="${ei}" data-v="${i}">${animSvg(v.anim, "thumb")}<span><b>${esc(v.nombre)}</b><small>${VARIANT_LABEL[v.tipo]}</small></span></button>`).join("")}</div>
@@ -782,12 +969,26 @@ document.addEventListener("input", (ev) => {
   if (t.dataset.set) {
     updateActive((a) => (a.ejercicios[+t.dataset.e].sets[+t.dataset.s][t.dataset.set] = t.value), false);
   }
+  if (t.dataset.cset) {
+    updateActive((a) => (a.cardio[+t.dataset.c].real[t.dataset.cset] = t.value), false);
+  }
 });
 document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.dataset.edit) {
     const v = Math.max(1, +t.value || 1);
     editRoutine((r) => (r.dias[+t.dataset.day].ejercicios[+t.dataset.i][t.dataset.edit] = v));
+  }
+  if (t.dataset.editCardio) {
+    editRoutine((r) => {
+      const c = r.dias[+t.dataset.day].cardio[+t.dataset.i];
+      if (t.dataset.editCardio === "modo") { c.modo = t.value; if (isInterval(c.modo)) c.min = intervalMinutes(c.modo); }
+      else c.min = Math.max(5, +t.value || 5);
+    });
+  }
+  if (t.name === "cardioEnfoque") {
+    document.querySelector("[data-cardio]").hidden = t.value === "ninguno";
+    document.querySelectorAll("[data-strength]").forEach((f) => (f.hidden = t.value === "solo"));
   }
   if (t.dataset.actChange === "progEx") { progEx = t.value; rerenderKeepScroll(); }
   if (t.dataset.actChange === "sound") { store.setObject("settings", { ...store.get().settings, sonido: t.checked }); timer.setSound(t.checked); }
@@ -864,7 +1065,7 @@ setInterval(() => {
   const a = store.getActive(), el = $("#elapsed");
   if (a && el) el.textContent = timer.mmss((Date.now() - a.inicio) / 1000);
 }, 1000);
-timer.onTimerChange(() => { const a = store.getActive(); if (a?.rest) { a.rest = null; store.setActive(a); } });
+timer.onTimerChange(() => { const a = store.getActive(); if (a?.rest || a?.cardioRun) { a.rest = null; a.cardioRun = null; store.setActive(a); } });
 
 window.addEventListener("hashchange", () => { closeModal(); render(); scrollTo(0, 0); });
 timer.setSound(store.get().settings?.sonido !== false);
@@ -873,6 +1074,7 @@ theme.apply(store.get().settings?.tema);
 // restaura el descanso si se recargó la página
 const act = store.getActive();
 if (act?.rest && act.rest.end > Date.now()) timer.startRest(0, act.rest.label, act.rest);
+else if (act?.cardioRun && act.cardio?.[act.cardioRun.ci]) { const run = act.cardioRun; startCardioTimer(act, run.ci, run.start); act.cardioRun = run; store.setActive(act); }
 
 render();
 if (drive.getStatus().state === "ok") drive.sync().catch(() => {});

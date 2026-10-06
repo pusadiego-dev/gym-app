@@ -54,7 +54,9 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: pan-x pan-y; }
+/* sin zoom: los toques no esperan al doble toque y el pellizco no amplía */
+body, a, button, input, select, textarea, label, svg { touch-action: manipulation; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
   font: 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
@@ -200,6 +202,9 @@ svg .cable { stroke: var(--muted); }
 svg .pulley { fill: var(--eq); }
 svg .pad { fill: var(--pad); }
 svg .floor { stroke: var(--line); }
+svg .water { fill: none; stroke: var(--series-1); stroke-width: 2.5; stroke-linecap: round; }
+svg .rope { fill: none; stroke: var(--plate); stroke-width: 2; }
+svg .wheel { fill: none; stroke: var(--eq); stroke-width: 5; }
 
 .ex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .ex-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; text-decoration: none; display: flex; flex-direction: column; gap: 2px; }
@@ -254,6 +259,8 @@ svg .floor { stroke: var(--line); }
 .timer-sub { color: var(--muted); font-size: .85rem; }
 .timer-actions { display: flex; gap: 8px; }
 .timer-sheet.done .ring-fg { stroke: var(--good); }
+.timer-sheet[data-phase="pausa"] .ring-fg, .timer-sheet[data-phase="calma"] .ring-fg, .timer-sheet[data-phase="calentamiento"] .ring-fg { stroke: var(--series-1); }
+.timer-sheet[data-phase="trabajo"] .timer-time { color: var(--accent); }
 .timer-sheet.done .timer-time { color: var(--good); }
 .timer-sheet.mini { flex-direction: row; justify-content: center; padding-top: 10px; gap: 12px; }
 .timer-sheet.mini .timer-ring { width: 64px; height: 64px; }
@@ -350,3 +357,14 @@ ul.plain { list-style: none; padding: 0 !important; }
 .custom-colors input[type=color] { width: 72px; height: 44px; padding: 2px; }
 .google-ok { background: var(--good-soft); border-color: transparent; }
 .google-cta b { display: block; margin-bottom: 2px; }
+
+/* cardio */
+.ex-params select { width: auto; min-height: 34px; padding: 4px 8px; border-radius: 8px; font-size: .85rem; max-width: 100%; }
+.cardio-wex .btn.block { margin: 8px 0 0; }
+.cardio-log { display: grid; grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); gap: 8px; align-items: end; margin-top: 10px; }
+.cardio-log label { display: flex; flex-direction: column; gap: 3px; font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.cardio-log input { text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; padding: 8px 4px; }
+.cardio-log .check { width: 100%; }
+.cardio-wex.complete .check { background: var(--good); border-color: var(--good); color: #fff; }
+.plain.modes li { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.plain.modes li:last-child { border-bottom: 0; }

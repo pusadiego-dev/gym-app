@@ -103,9 +103,21 @@ function lerpPose(A, B, t) {
 const seg = (a, b, w, cls = "") => `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke-width="${w}" class="${cls}"/>`;
 const circ = (c, r, cls) => `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${r}" class="${cls}"/>`;
 
-function propSvg(pr, J) {
+function propSvg(pr, J, pose) {
   const at = (n) => J[n || "hand"];
   switch (pr.k) {
+    case "circle":
+      return `<circle cx="${pr.x}" cy="${pr.y}" r="${pr.r}" class="${pr.cls || "eq"}"/>`;
+    case "water":
+      return `<path d="M8 ${pr.y} q 11 -4 23 0 t 23 0 t 23 0 t 23 0 t 23 0 t 23 0 t 23 0 t 23 0" class="water"/>`;
+    case "rope": { // comba: lazo que gira alrededor del cuerpo según el ángulo "rope" de la pose (0 = bajo los pies)
+      const h1 = J.hand, h2 = J.hand2 || J.hand, a = rad(pose.rope || 0);
+      const P = [h1[0] + Math.sin(a) * 50, h1[1] + 14 + Math.cos(a) * 92];
+      const v = [(P[0] - h1[0]) / 0.75, (P[1] - h1[1]) / 0.75], len = Math.hypot(...v) || 1, n = [(-v[1] / len) * 16, (v[0] / len) * 16];
+      const c1 = [h1[0] + v[0] + n[0], h1[1] + v[1] + n[1]], c2 = [h1[0] + v[0] - n[0], h1[1] + v[1] - n[1]];
+      const f = (q) => `${q[0].toFixed(1)},${q[1].toFixed(1)}`;
+      return `<path d="M${f(h1)} C${f(c1)} ${f(c2)} ${f(h2)}" class="rope"/>`;
+    }
     case "rect":
       return `<rect x="${pr.x}" y="${pr.y}" width="${pr.w}" height="${pr.h}" rx="${pr.r ?? 3}" class="eq" ${pr.rot ? `transform="rotate(${pr.rot} ${pr.x + pr.w / 2} ${pr.y + pr.h / 2})"` : ""}/>`;
     case "line":
@@ -173,7 +185,11 @@ export function frameSvg(anim, t) {
   const fr = anim.frames;
   let pose;
   if (fr.length === 1) pose = fr[0];
-  else {
+  else if (anim.loop) {
+    // ciclo continuo (pedalear, correr, nadar): el último fotograma coincide con el primero
+    const x = t * (fr.length - 1), i = Math.min(fr.length - 2, Math.floor(x));
+    pose = lerpPose(fr[i], fr[i + 1], x - i);
+  } else {
     const n = fr.length - 1;
     const pp = t < 0.5 ? t * 2 : 2 - t * 2; // 0→1→0
     const e = (1 - Math.cos(Math.PI * pp)) / 2;
@@ -183,8 +199,8 @@ export function frameSvg(anim, t) {
   }
   const front = anim.view === "front";
   const J = front ? solveFront(pose) : solveSide(pose);
-  const back = (anim.props || []).filter((p) => !p.front).map((p) => propSvg(p, J)).join("");
-  const fore = (anim.props || []).filter((p) => p.front).map((p) => propSvg(p, J)).join("");
+  const back = (anim.props || []).filter((p) => !p.front).map((p) => propSvg(p, J, pose)).join("");
+  const fore = (anim.props || []).filter((p) => p.front).map((p) => propSvg(p, J, pose)).join("");
   const floor = `<line x1="8" y1="${FLOOR + 5}" x2="192" y2="${FLOOR + 5}" class="floor" stroke-width="2"/>`;
   return floor + back + (front ? figureFront(J) : figureSide(J)) + fore;
 }
@@ -194,7 +210,7 @@ let rafId = null;
 function tick(now) {
   for (const r of running) {
     if (!r.el.isConnected) { running.delete(r); continue; }
-    const t = ((now - r.start) % r.period) / r.period;
+    const t = ((((now - r.start) % r.period) + r.period) % r.period) / r.period;
     r.el.innerHTML = frameSvg(r.anim, t);
   }
   rafId = running.size ? requestAnimationFrame(tick) : null;
