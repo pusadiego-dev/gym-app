@@ -1,5 +1,7 @@
 # Gym App
 
+**Abrir la app:** https://pusadiego-dev.github.io/gym-app/
+
 Web app (PWA) para entrenar en el gimnasio. Funciona en Chrome o Safari en el iPhone, la tablet o el ordenador, y se puede añadir a la pantalla de inicio como una app. No necesita servidor: son archivos estáticos.
 
 ## Qué incluye
