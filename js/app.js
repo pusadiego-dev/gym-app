@@ -17,7 +17,7 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
-const APP_VERSION = "5";
+const APP_VERSION = "6";
 const EMOJIS = ["🏆", "💪", "🔥", "🥇", "🎯", "🚀", "⭐", "🏋️", "🦵", "🫀", "⚡", "👑"];
 
 // ---------- utilidades de UI ----------
@@ -26,7 +26,7 @@ function toast(msg) {
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => t.classList.remove("show"), 2600);
+  toast.t = setTimeout(() => t.classList.remove("show"), Math.max(2600, msg.length * 60));
 }
 function modal(html, onMount) {
   const m = $("#modal");

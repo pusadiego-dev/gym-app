@@ -3,7 +3,9 @@
 import { GOOGLE_CLIENT_ID } from "./config.js";
 import * as store from "./store.js";
 
-const SCOPE = "openid email profile https://www.googleapis.com/auth/drive.appdata";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+const SCOPE = "openid email profile " + DRIVE_SCOPE;
+const NO_DRIVE = "Falta el permiso de Drive: vuelve a conectar y, en la ventana de Google, marca la casilla para que Gym App guarde sus datos en tu Drive.";
 const USER_KEY = "gymapp:googleUser";
 const FILE = "gymapp-data.json";
 const TOKEN_KEY = "gymapp:token";
@@ -67,6 +69,13 @@ export async function connect() {
       scope: SCOPE,
       callback: async (resp) => {
         if (resp.error) { setStatus("error", "Google rechazó el acceso"); return reject(new Error(resp.error)); }
+        // Google deja desmarcar permisos: sin el de Drive no se puede sincronizar.
+        if (!google.accounts.oauth2.hasGrantedAllScopes(resp, DRIVE_SCOPE)) {
+          google.accounts.oauth2.revoke(resp.access_token, () => {});
+          localStorage.removeItem(CONNECTED_KEY);
+          setStatus("error", NO_DRIVE);
+          return reject(new Error(NO_DRIVE));
+        }
         token = { value: resp.access_token, exp: Date.now() + (resp.expires_in - 60) * 1000 };
         localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
         localStorage.setItem(CONNECTED_KEY, "1");
@@ -98,7 +107,16 @@ async function api(url, opts = {}) {
     setStatus("expired", "Sesión de Google caducada: toca para sincronizar");
     throw new Error("expired");
   }
-  if (!r.ok) throw new Error(`Drive respondió ${r.status}`);
+  if (!r.ok) {
+    let reason = "";
+    try { reason = (await r.json()).error?.errors?.[0]?.reason || ""; } catch {}
+    if (r.status === 403 && /insufficient/i.test(reason)) {
+      token = null; localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(CONNECTED_KEY);
+      throw new Error(NO_DRIVE);
+    }
+    if (r.status === 403 && /accessNotConfigured|SERVICE_DISABLED/i.test(reason)) throw new Error("La API de Google Drive no está activada en el proyecto de Google Cloud.");
+    throw new Error(`Drive respondió ${r.status}${reason ? ` (${reason})` : ""}`);
+  }
   return r;
 }
 
