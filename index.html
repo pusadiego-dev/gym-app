@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gym App</title>
+  <meta name="description" content="Rutinas de gimnasio basadas en la evidencia, registro de series, temporizadores, evolución y logros.">
+  <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Gym App">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="topbar">
+    <a href="#/hoy" class="brand" aria-label="Inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 10h2v4H2zM5 7h3v10H5zM16 7h3v10h-3zM20 10h2v4h-2zM8 11h8v2H8z"/></svg>Gym App</a>
+    <div class="top-right"><button id="sync" class="sync-chip" data-state="off" type="button"><i></i><span>Local</span></button><a href="#/perfil" id="avatarTop" aria-label="Perfil"></a></div>
+  </div>
+  <main id="view" tabindex="-1"></main>
+  <nav class="tabbar" aria-label="Secciones">
+    <a href="#/hoy" data-r="hoy"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Hoy</a>
+    <a href="#/rutina" data-r="rutina"><svg viewBox="0 0 24 24"><path d="M4 5h16v2H4zM4 11h16v2H4zM4 17h10v2H4z"/></svg>Rutina</a>
+    <a href="#/ejercicios" data-r="ejercicios"><svg viewBox="0 0 24 24"><path d="M2 10h2v4H2zM5 7h3v10H5zM16 7h3v10h-3zM20 10h2v4h-2zM8 11h8v2H8z"/></svg>Ejercicios</a>
+    <a href="#/progreso" data-r="progreso"><svg viewBox="0 0 24 24"><path d="M3 19h18v2H3zM5 15l4-5 4 3 6-8 1.6 1.2-7.2 9.6-4-3-2.8 3.4z"/></svg>Progreso</a>
+    <a href="#/logros" data-r="logros"><svg viewBox="0 0 24 24"><path d="M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3zm0 4H6v1a2 2 0 0 0 1 1.7zm10 0v2.7A2 2 0 0 0 18 8V7z"/></svg>Logros</a>
+    <a href="#/perfil" data-r="perfil"><svg viewBox="0 0 24 24"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2c-4.4 0-8 2.2-8 5v2h16v-2c0-2.8-3.6-5-8-5z"/></svg>Perfil</a>
+  </nav>
+  <div id="modal" class="modal"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+// Sincronización con Google Drive: guarda un único JSON en la carpeta oculta de la app (appDataFolder).
+// Solo la app puede ver ese archivo; no aparece en tu Drive ni accede a tus otros archivos.
+import { GOOGLE_CLIENT_ID } from "./config.js";
+import * as store from "./store.js";
+
+const SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+const FILE = "gymapp-data.json";
+const TOKEN_KEY = "gymapp:token";
+const CONNECTED_KEY = "gymapp:driveConnected";
+const CID_KEY = "gymapp:clientId";
+
+let token = null;
+let tokenClient = null;
+let fileId = null;
+let pushTimer = null;
+let status = { state: "off", msg: "Sin conectar", last: null };
+const listeners = new Set();
+
+export const clientId = () => localStorage.getItem(CID_KEY) || GOOGLE_CLIENT_ID || "";
+export const setClientId = (v) => { localStorage.setItem(CID_KEY, v.trim()); tokenClient = null; };
+export const wasConnected = () => localStorage.getItem(CONNECTED_KEY) === "1";
+export const getStatus = () => status;
+export const onStatus = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
+function setStatus(state, msg) {
+  status = { ...status, state, msg, last: state === "ok" ? new Date() : status.last };
+  listeners.forEach((f) => f(status));
+}
+
+try {
+  const t = JSON.parse(localStorage.getItem(TOKEN_KEY));
+  if (t && t.exp > Date.now() + 60000) token = t;
+} catch {}
+if (token) setStatus("ok", "Conectado");
+else if (wasConnected()) setStatus("expired", "Toca para sincronizar");
+
+function loadGis() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true;
+    s.onload = res;
+    s.onerror = () => rej(new Error("No se pudo cargar Google (¿sin conexión?)"));
+    document.head.appendChild(s);
+  });
+}
+
+// Debe llamarse desde un toque del usuario (abre la ventana de Google).
+export async function connect() {
+  if (!clientId()) throw new Error("Falta el ID de cliente de Google (ver Perfil → Sincronización).");
+  await loadGis();
+  return new Promise((resolve, reject) => {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId(),
+      scope: SCOPE,
+      callback: async (resp) => {
+        if (resp.error) { setStatus("error", "Google rechazó el acceso"); return reject(new Error(resp.error)); }
+        token = { value: resp.access_token, exp: Date.now() + (resp.expires_in - 60) * 1000 };
+        localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
+        localStorage.setItem(CONNECTED_KEY, "1");
+        try { await sync(); resolve(); } catch (e) { reject(e); }
+      },
+      error_callback: (e) => { setStatus(wasConnected() ? "expired" : "off", "No se completó el inicio de sesión"); reject(new Error(e?.message || "Ventana cerrada")); },
+    });
+    tokenClient.requestAccessToken({ prompt: wasConnected() ? "" : "consent" });
+  });
+}
+
+export function disconnect() {
+  if (token && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token.value, () => {});
+  token = null; fileId = null;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(CONNECTED_KEY);
+  setStatus("off", "Sin conectar");
+}
+
+const valid = () => !!token && token.exp > Date.now();
+export const hasToken = valid;
+
+async function api(url, opts = {}) {
+  const r = await fetch(url, { ...opts, headers: { Authorization: `Bearer ${token.value}`, ...(opts.headers || {}) } });
+  if (r.status === 401) {
+    token = null; localStorage.removeItem(TOKEN_KEY);
+    setStatus("expired", "Sesión de Google caducada: toca para sincronizar");
+    throw new Error("expired");
+  }
+  if (!r.ok) throw new Error(`Drive respondió ${r.status}`);
+  return r;
+}
+
+async function findFile() {
+  if (fileId) return fileId;
+  const q = encodeURIComponent(`name='${FILE}'`);
+  const r = await api(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime%20desc`);
+  const j = await r.json();
+  fileId = j.files?.[0]?.id || null;
+  return fileId;
+}
+
+async function download() {
+  const id = await findFile();
+  if (!id) return null;
+  const r = await api(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`);
+  return r.json();
+}
+
+async function upload(data) {
+  const body = JSON.stringify(data);
+  const id = await findFile();
+  if (id) {
+    await api(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body });
+    return;
+  }
+  const boundary = "gymapp" + Math.random().toString(36).slice(2);
+  const meta = { name: FILE, parents: ["appDataFolder"], mimeType: "application/json" };
+  const multipart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+  const r = await api("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body: multipart });
+  fileId = (await r.json()).id;
+}
+
+let syncing = null;
+// Descarga, fusiona con lo local y sube el resultado.
+export async function sync() {
+  if (!valid()) { if (wasConnected()) setStatus("expired", "Toca para sincronizar"); return; }
+  if (!navigator.onLine) { setStatus("pending", "Sin conexión: se sincronizará luego"); return; }
+  if (syncing) return syncing;
+  syncing = (async () => {
+    setStatus("busy", "Sincronizando…");
+    try {
+      const remote = await download();
+      const merged = store.merge(store.get(), remote || {});
+      if (JSON.stringify(merged) !== JSON.stringify(store.get())) store.replaceAll(merged, "sync");
+      await upload(merged);
+      setStatus("ok", "Sincronizado");
+    } catch (e) {
+      if (e.message !== "expired") setStatus("error", "Error al sincronizar: " + e.message);
+      throw e;
+    } finally {
+      syncing = null;
+    }
+  })();
+  return syncing;
+}
+
+// Tras cada cambio local, sube en unos segundos (si hay sesión válida).
+store.subscribe((_, source) => {
+  if (source !== "local") return;
+  if (!valid()) { if (wasConnected()) setStatus("pending", "Cambios sin sincronizar: toca para sincronizar"); return; }
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => sync().catch(() => {}), 2500);
+});
+window.addEventListener("online", () => valid() && sync().catch(() => {}));
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && valid()) sync().catch(() => {}); });
