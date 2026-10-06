@@ -17,6 +17,7 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
+const APP_VERSION = "5";
 const EMOJIS = ["🏆", "💪", "🔥", "🥇", "🎯", "🚀", "⭐", "🏋️", "🦵", "🫀", "⚡", "👑"];
 
 // ---------- utilidades de UI ----------
@@ -552,6 +553,7 @@ function viewProfile() {
       <div class="row-btns"><label class="btn ghost small">Cambiar foto<input type="file" accept="image/*" id="avatarFile" hidden></label>${p.avatar ? `<button class="btn danger-ghost small" data-act="removeAvatar">Quitar</button>` : ""}<a class="btn ghost small" href="#/formulario">Editar perfil</a></div></div></div>
     ${drive.getUser()?.email ? `<p class="muted small">${esc(drive.getUser().email)}</p>` : ""}<p class="muted small">${[p.edad && `${p.edad} años`, p.peso && `${fmt(+p.peso)} kg`, p.altura && `${p.altura} cm`].filter(Boolean).join(" · ")}</p>
     <p>${P.LEVELS[p.experiencia]?.label} · ${P.GOALS[p.objetivo]?.label} · ${p.dias} días · ${p.duracion} min</p></section>` : `<a class="btn primary block" href="#/formulario">Crear perfil</a>`}
+  ${drive.clientId() && !drive.getUser() && drive.getStatus().state !== "off" ? `<section class="card google-cta"><b>Usa tus datos de Google</b><p class="small muted">Vuelve a conectar para que la app pueda leer tu nombre, correo y foto.</p><button class="btn ghost block" data-act="driveConnect">Conectar con Google</button></section>` : ""}
   <section class="card sync-card"><h3>Sincronización con Google Drive</h3>
     <p class="muted small">Tus datos se guardan en este dispositivo y, si conectas Google, en una carpeta privada de tu Drive que solo ve esta app. Así los tienes en el iPhone, la tablet y el ordenador.</p>
     <p class="sync-state" data-state="${st.state}">● ${esc(st.msg)}${st.last ? ` · ${st.last.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : ""}</p>
@@ -571,7 +573,7 @@ function viewProfile() {
     <label class="switch"><input type="checkbox" data-act-change="sound" ${store.get().settings?.sonido !== false ? "checked" : ""}> Sonido al terminar el descanso</label>
   </section>
   <section class="card"><h3>Referencias científicas</h3><ol class="refs small">${P.REFERENCES.map((r) => `<li>${esc(r)}</li>`).join("")}</ol>
-  <p class="muted small">Esta app no sustituye el consejo médico. Si tienes dolor o una lesión, consulta a un profesional.</p></section>`;
+  <p class="muted small">Versión ${APP_VERSION}. Esta app no sustituye el consejo médico. Si tienes dolor o una lesión, consulta a un profesional.</p></section>`;
 }
 
 function appearanceHtml() {
@@ -705,6 +707,7 @@ const actions = {
       fillFromGoogle();
       toast(onForm && hasProfile ? "Datos recuperados de tu Drive" : "Conectado con Google");
       if (onForm && hasProfile) { location.hash = "#/hoy"; return; }
+      if (!hasProfile) { location.hash = "#/formulario"; return; }
     } catch (e) { toast(e.message); }
     render();
   },
@@ -875,5 +878,14 @@ render();
 if (drive.getStatus().state === "ok") drive.sync().catch(() => {});
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  navigator.serviceWorker.register("./sw.js").then((reg) => {
+    // busca versión nueva al volver a la app y recarga una vez cuando se instala
+    document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && reg.update().catch(() => {}));
+    let reloaded = !navigator.serviceWorker.controller; // primera visita: no recargar
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloaded || store.getActive()) return;
+      reloaded = true;
+      location.reload();
+    });
+  }).catch(() => {});
 }
