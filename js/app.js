@@ -18,7 +18,7 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
-const APP_VERSION = "9";
+const APP_VERSION = "10";
 const cardioName = (c) => cardioById[c.cardioId]?.nombre || c.cardioId;
 const cardioLine = (c) => `${cardioName(c)} · ${CARDIO_MODES[c.modo]?.corto || ""} · ${c.min} min`;
 const dayCardio = (d) => d.cardio || [];
@@ -40,8 +40,31 @@ document.addEventListener("wheel", (e) => { if (e.ctrlKey) e.preventDefault(); }
 document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && ["+", "-", "=", "0"].includes(e.key)) e.preventDefault(); });
 
 // ---------- solo vertical ----------
-// Android (app instalada) respeta la orientación del manifiesto; iOS no deja bloquearla, así que en horizontal se pide girar el móvil.
+// Android (app instalada) respeta la orientación del manifiesto. iOS no deja bloquearla, así que con el móvil
+// en horizontal giramos la app por dentro para que se siga viendo en vertical respecto al móvil.
 try { screen.orientation?.lock?.("portrait").catch(() => {}); } catch {}
+const landscapePhone = matchMedia("(orientation: landscape) and (max-height: 500px) and (pointer: coarse)");
+const rotated = () => document.documentElement.classList.contains("rot");
+// En modo girado se desplaza #view en lugar de la ventana.
+const getY = () => (rotated() ? document.getElementById("view").scrollTop : scrollY);
+const setY = (y) => (rotated() ? (document.getElementById("view").scrollTop = y) : scrollTo(0, y));
+function applyRotation() {
+  let a = screen.orientation?.angle ?? window.orientation ?? 90;
+  a = ((+a % 360) + 360) % 360;
+  const cls = landscapePhone.matches ? (a === 270 ? "rot-r" : "rot-l") : "";
+  const html = document.documentElement;
+  if ((html.dataset.rot || "") === cls) return;
+  const y = getY();
+  html.classList.remove("rot", "rot-l", "rot-r");
+  if (cls) html.classList.add("rot", cls);
+  html.dataset.rot = cls;
+  setY(y);
+}
+applyRotation();
+landscapePhone.addEventListener?.("change", applyRotation);
+screen.orientation?.addEventListener?.("change", applyRotation);
+addEventListener("orientationchange", () => setTimeout(applyRotation, 50));
+addEventListener("resize", applyRotation);
 
 // ---------- utilidades de UI ----------
 function toast(msg) {
@@ -55,7 +78,8 @@ function toast(msg) {
 let lockedY = null;
 function lockScroll() {
   if (lockedY !== null) return;
-  lockedY = scrollY;
+  lockedY = getY();
+  if (rotated()) { document.getElementById("view").style.overflow = "hidden"; return; }
   Object.assign(document.body.style, { position: "fixed", top: `-${lockedY}px`, left: "0", right: "0" });
 }
 function unlockScroll() {
@@ -63,9 +87,10 @@ function unlockScroll() {
   const y = lockedY;
   lockedY = null;
   Object.assign(document.body.style, { position: "", top: "", left: "", right: "" });
-  scrollTo(0, y);
+  document.getElementById("view").style.overflow = "";
+  setY(y);
 }
-const pageY = () => (lockedY ?? scrollY);
+const pageY = () => (lockedY ?? getY());
 function modal(html, onMount) {
   const m = $("#modal");
   lockScroll();
@@ -258,7 +283,7 @@ function render() {
   renderSyncChip();
   $("#avatarTop").innerHTML = profile ? avatarHtml(profile, "sm") : "";
 }
-function rerenderKeepScroll() { const y = pageY(); render(); if (lockedY === null) scrollTo(0, y); }
+function rerenderKeepScroll() { const y = pageY(); render(); if (lockedY === null) setY(y); }
 
 function renderSyncChip() {
   const s = drive.getStatus();
@@ -1102,7 +1127,7 @@ setInterval(() => {
 }, 1000);
 timer.onTimerChange(() => { const a = store.getActive(); if (a?.rest || a?.cardioRun) { a.rest = null; a.cardioRun = null; store.setActive(a); } });
 
-window.addEventListener("hashchange", () => { lockedY = lockedY === null ? null : 0; closeModal(); render(); scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { lockedY = lockedY === null ? null : 0; closeModal(); render(); setY(0); });
 timer.setSound(store.get().settings?.sonido !== false);
 theme.apply(store.get().settings?.tema);
 
