@@ -18,7 +18,7 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
-const APP_VERSION = "8";
+const APP_VERSION = "9";
 const cardioName = (c) => cardioById[c.cardioId]?.nombre || c.cardioId;
 const cardioLine = (c) => `${cardioName(c)} · ${CARDIO_MODES[c.modo]?.corto || ""} · ${c.min} min`;
 const dayCardio = (d) => d.cardio || [];
@@ -39,6 +39,10 @@ document.addEventListener("touchend", (e) => {
 document.addEventListener("wheel", (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
 document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && ["+", "-", "=", "0"].includes(e.key)) e.preventDefault(); });
 
+// ---------- solo vertical ----------
+// Android (app instalada) respeta la orientación del manifiesto; iOS no deja bloquearla, así que en horizontal se pide girar el móvil.
+try { screen.orientation?.lock?.("portrait").catch(() => {}); } catch {}
+
 // ---------- utilidades de UI ----------
 function toast(msg) {
   const t = $("#toast");
@@ -47,13 +51,29 @@ function toast(msg) {
   clearTimeout(toast.t);
   toast.t = setTimeout(() => t.classList.remove("show"), Math.max(2600, msg.length * 60));
 }
+// Con una ventana abierta, el fondo no se mueve (en iOS overflow:hidden no basta: se fija el body).
+let lockedY = null;
+function lockScroll() {
+  if (lockedY !== null) return;
+  lockedY = scrollY;
+  Object.assign(document.body.style, { position: "fixed", top: `-${lockedY}px`, left: "0", right: "0" });
+}
+function unlockScroll() {
+  if (lockedY === null) return;
+  const y = lockedY;
+  lockedY = null;
+  Object.assign(document.body.style, { position: "", top: "", left: "", right: "" });
+  scrollTo(0, y);
+}
+const pageY = () => (lockedY ?? scrollY);
 function modal(html, onMount) {
   const m = $("#modal");
+  lockScroll();
   m.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><button class="close" data-act="closeModal" aria-label="Cerrar">✕</button>${html}</div>`;
   m.classList.add("open");
   onMount?.(m);
 }
-function closeModal() { $("#modal").classList.remove("open"); $("#modal").innerHTML = ""; }
+function closeModal() { $("#modal").classList.remove("open"); $("#modal").innerHTML = ""; unlockScroll(); }
 const confirmBox = (msg) => window.confirm(msg);
 
 function avatarHtml(p, cls = "") {
@@ -238,7 +258,7 @@ function render() {
   renderSyncChip();
   $("#avatarTop").innerHTML = profile ? avatarHtml(profile, "sm") : "";
 }
-function rerenderKeepScroll() { const y = scrollY; render(); scrollTo(0, y); }
+function rerenderKeepScroll() { const y = pageY(); render(); if (lockedY === null) scrollTo(0, y); }
 
 function renderSyncChip() {
   const s = drive.getStatus();
@@ -1082,7 +1102,7 @@ setInterval(() => {
 }, 1000);
 timer.onTimerChange(() => { const a = store.getActive(); if (a?.rest || a?.cardioRun) { a.rest = null; a.cardioRun = null; store.setActive(a); } });
 
-window.addEventListener("hashchange", () => { closeModal(); render(); scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { lockedY = lockedY === null ? null : 0; closeModal(); render(); scrollTo(0, 0); });
 timer.setSound(store.get().settings?.sonido !== false);
 theme.apply(store.get().settings?.tema);
 

@@ -6,6 +6,7 @@
   "start_url": "./#/hoy",
   "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#111214",
   "theme_color": "#e2531f",
   "icons": [
