@@ -90,7 +90,7 @@ export async function connect() {
 
 export function disconnect() {
   if (token && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token.value, () => {});
-  token = null; fileId = null;
+  token = null; fileId = null; gen++; clearTimeout(pushTimer);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(CONNECTED_KEY);
   localStorage.removeItem(USER_KEY);
@@ -151,16 +151,19 @@ async function upload(data) {
 }
 
 let syncing = null;
+let gen = 0; // cambia al desconectar: descarta sincronizaciones que estaban en curso
 // Descarga, fusiona con lo local y sube el resultado.
 export async function sync() {
   if (!valid()) { if (wasConnected()) setStatus("expired", "Toca para sincronizar"); return; }
   if (!navigator.onLine) { setStatus("pending", "Sin conexión: se sincronizará luego"); return; }
   if (syncing) return syncing;
+  const myGen = gen;
   syncing = (async () => {
     setStatus("busy", "Sincronizando…");
     try {
       if (!getUser()) await fetchUser();
       const remote = await download();
+      if (myGen !== gen) return; // se desconectó mientras descargaba
       const merged = store.merge(store.get(), remote || {});
       if (JSON.stringify(merged) !== JSON.stringify(store.get())) store.replaceAll(merged, "sync");
       await upload(merged);

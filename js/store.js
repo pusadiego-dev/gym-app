@@ -4,7 +4,7 @@ const ACTIVE_KEY = "gymapp:active"; // entreno en curso (solo en este dispositiv
 const COLLECTIONS = ["sessions", "achievements", "goals", "bodyweight"];
 const OBJECTS = ["profile", "routine", "settings"];
 
-const empty = () => ({ version: 1, profile: null, routine: null, settings: { sonido: true, updatedAt: 0 }, sessions: [], achievements: [], goals: [], bodyweight: [] });
+const empty = () => ({ version: 1, resetAt: 0, profile: null, routine: null, settings: { sonido: true, updatedAt: 0 }, sessions: [], achievements: [], goals: [], bodyweight: [] });
 
 const listeners = new Set();
 let state = load();
@@ -50,15 +50,18 @@ export function obj(name) {
 }
 
 // Fusión sin conflictos: por cada elemento gana la versión editada más recientemente.
+// resetAt: fecha del último «borrar todo»; lo anterior se descarta en todos los dispositivos.
 export function merge(a, b) {
   const out = empty();
+  const r = (out.resetAt = Math.max(a?.resetAt || 0, b?.resetAt || 0));
+  const fresh = (x) => x && (x.updatedAt || 0) >= r;
   for (const k of OBJECTS) {
-    const x = a?.[k], y = b?.[k];
+    const x = fresh(a?.[k]) ? a[k] : null, y = fresh(b?.[k]) ? b[k] : null;
     out[k] = (x?.updatedAt || 0) >= (y?.updatedAt || 0) ? x ?? y ?? out[k] : y;
   }
   for (const k of COLLECTIONS) {
     const map = new Map();
-    for (const it of [...(a?.[k] || []), ...(b?.[k] || [])]) {
+    for (const it of [...(a?.[k] || []), ...(b?.[k] || [])].filter(fresh)) {
       const prev = map.get(it.id);
       if (!prev || (it.updatedAt || 0) > (prev.updatedAt || 0)) map.set(it.id, it);
     }
@@ -69,6 +72,13 @@ export function merge(a, b) {
 export function replaceAll(data, source = "sync") {
   state = { ...empty(), ...data };
   emit(source);
+}
+
+// Borra todo y marca la fecha para que la copia de Drive y otros dispositivos también lo descarten al sincronizar.
+export function wipe(everywhere) {
+  setActive(null);
+  state = { ...empty(), resetAt: everywhere ? now() : 0 };
+  emit("wipe");
 }
 
 export function exportJson() { return JSON.stringify(state, null, 2); }
