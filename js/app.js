@@ -27,7 +27,21 @@ const ymd = (d = new Date(), n = 0) => { const x = new Date(d); x.setDate(x.getD
 const dayMs = (s) => new Date(s + "T00:00:00").getTime();
 const fmtRange = (a, b) => `${fmtDate(a + "T12:00", { day: "numeric", month: "short" })} – ${fmtDate(b + "T12:00", { day: "numeric", month: "short", year: "numeric" })}`;
 const vacations = () => store.live("vacations").sort((a, b) => b.inicio.localeCompare(a.inicio));
-const vacationNow = () => { const t = ymd(); return vacations().find((v) => v.inicio <= t && t <= v.fin); };
+const vacationNow = () => { const t = ymd(); return vacations().find((v) => !v.cerrada && v.inicio <= t && t <= v.fin); };
+// Tipos de actividad que se pueden apuntar durante las vacaciones (km: pide distancia).
+const VAC_TYPES = [
+  { id: "caminar", emoji: "🥾", nombre: "Caminata / senderismo", km: true },
+  { id: "correr", emoji: "🏃", nombre: "Correr", km: true },
+  { id: "bici", emoji: "🚴", nombre: "Bici", km: true },
+  { id: "nadar", emoji: "🏊", nombre: "Nadar", km: true },
+  { id: "cardio", emoji: "🫀", nombre: "Otro cardio" },
+  { id: "calistenia", emoji: "🤸", nombre: "Calistenia" },
+  { id: "fuerza", emoji: "🏋️", nombre: "Fuerza / gimnasio" },
+  { id: "deporte", emoji: "⚽", nombre: "Deporte (pádel, fútbol…)" },
+  { id: "estiramientos", emoji: "🧘", nombre: "Estiramientos / yoga" },
+  { id: "otro", emoji: "✍️", nombre: "Otra cosa" },
+];
+const vacType = (id) => VAC_TYPES.find((x) => x.id === id) || VAC_TYPES[VAC_TYPES.length - 1];
 const weekInVacation = (w) => vacations().some((v) => dayMs(v.inicio) < w + 7 * DAY && dayMs(v.fin) + DAY > w);
 const setsDone = (e) => e.sets.filter((x) => x.hecho !== false);
 const volOf = (s) => s.ejercicios.reduce((n, e) => n + setsDone(e).reduce((m, x) => m + (+x.peso || 0) * (+x.reps || 0), 0), 0);
@@ -344,9 +358,8 @@ function viewHome() {
   return `
   <header class="page-h hello"><div><p class="muted">${fmtDate(new Date(), { weekday: "long", day: "numeric", month: "long" })}</p><h1>Hola, ${esc(p.nombre || "atleta")}</h1></div><a href="#/perfil" aria-label="Perfil">${avatarHtml(p, "md")}</a></header>
   ${active ? `<a class="card resume" href="#/entreno"><b>Entreno en curso</b><span>${esc(active.diaNombre)} · toca para continuar</span></a>` : ""}
-  ${vac ? `<a class="card vac on" href="#/vacaciones/${vac.id}"><b>🏖 Modo vacaciones: ${esc(vac.nombre)}</b><span class="small">Hasta el ${fmtDate(vac.fin + "T12:00", { day: "numeric", month: "long" })}. Estos días no cuentan como semanas perdidas. Toca para apuntar en el diario.</span></a>`
-    : nextVac ? `<a class="card vac" href="#/vacaciones/${nextVac.id}"><b>🏖 Próximas vacaciones: ${esc(nextVac.nombre)}</b><span class="small muted">${fmtRange(nextVac.inicio, nextVac.fin)}</span></a>` : ""}
-  ${dl ? `<section class="card deload on"><b>🔋 Semana de descarga hasta el ${fmtDate(dl.fin + "T12:00", { day: "numeric", month: "long" })}</b><p class="small">Mitad de series y un 10 % menos de peso para recuperarte. <button class="link" data-act="deloadStop">Terminarla ya</button></p></section>`
+  ${vac ? vacHomeCard(vac) : ""}
+  ${vac ? "" : dl ? `<section class="card deload on"><b>🔋 Semana de descarga hasta el ${fmtDate(dl.fin + "T12:00", { day: "numeric", month: "long" })}</b><p class="small">Mitad de series y un 10 % menos de peso para recuperarte. <button class="link" data-act="deloadStop">Terminarla ya</button></p></section>`
     : dlSug ? `<section class="card deload"><p class="eyebrow">Recomendación</p><b>🔋 Toca semana de descarga</b>
       <p class="small">Llevas ${dlSug.weeks} semanas entrenando${dlSug.stalled.length ? ` y estás estancado en ${esc(dlSug.stalled.slice(0, 3).join(", "))}` : ""}. Una semana más suave (la mitad de series y un 10 % menos de peso) te ayuda a recuperar y volver más fuerte.</p>
       <div class="row-btns"><button class="btn primary small" data-act="deloadStart">Empezar descarga (7 días)</button><button class="btn ghost small" data-act="deloadLater">Ahora no</button></div></section>` : ""}
@@ -355,7 +368,7 @@ function viewHome() {
     <div class="stat"><span class="n">${streak}</span><span>semanas seguidas</span></div>
     <div class="stat"><span class="n">${ss.length}</span><span>entrenos</span></div>
   </div>
-  ${r ? `
+  ${vac ? "" : r ? `
   <section class="card next">
     <p class="eyebrow">Toca hoy</p>
     <h2>${esc(r.dias[next].nombre)}</h2>
@@ -364,7 +377,8 @@ function viewHome() {
     <button class="btn primary block" data-act="start" data-day="${next}" ${active ? "disabled" : ""}>Empezar entreno</button>
   </section>
   <section><h3>Otros días</h3><div class="chips">${r.dias.map((d, i) => i === next ? "" : `<button class="chip" data-act="start" data-day="${i}" ${active ? "disabled" : ""}>${esc(d.nombre)}</button>`).join("")}</div></section>` : `<a class="btn primary block" href="#/formulario">Crear mi rutina</a>`}
-  <div class="chips"><a class="chip" href="#/vacaciones">🏖 Vacaciones y diario</a></div>
+  ${vac ? "" : `<section class="card vac-cta"><div><b>🏖 Vacaciones</b><p class="small muted">${nextVac ? `Próximas: <b>${esc(nextVac.nombre)}</b>, ${fmtRange(nextVac.inicio, nextVac.fin)}. La rutina se pausa esos días.` : "¿Te vas de viaje? Marca las fechas: la rutina se pausa y cada día apuntas lo que hagas."}</p></div>
+    <div class="row-btns"><a class="btn primary small" href="#/vacaciones">${nextVac ? "Ver vacaciones" : "+ Añadir vacaciones"}</a></div></section>`}
   ${lastAch ? `<section class="card ach-mini"><span class="emoji">${lastAch.emoji}</span><div><p class="eyebrow">Último logro</p><b>${esc(lastAch.titulo)}</b></div></section>` : ""}
   ${ss[0] ? `<section><h3>Último entreno</h3>${sessionCard(ss[0])}</section>` : ""}`;
 }
@@ -742,21 +756,41 @@ function viewVacations(id) {
       <div class="two"><label>Empiezo el día<input type="date" name="inicio" required value="${ymd()}"></label><label>Acabo el día<input type="date" name="fin" required value="${ymd(new Date(), 6)}"></label></div>
       <button class="btn primary block">Guardar vacaciones</button>
     </form></section>
-  <section>${vs.map((v) => { const t = ymd(), st = v.inicio <= t && t <= v.fin ? "ahora" : v.inicio > t ? "próximas" : ""; return `<a class="card vac-row ${st === "ahora" ? "on" : ""}" href="#/vacaciones/${v.id}"><b>🏖 ${esc(v.nombre)}</b><span class="muted small">${fmtRange(v.inicio, v.fin)} · ${(v.notas || []).length} ${(v.notas || []).length === 1 ? "nota" : "notas"}${st ? ` · ${st}` : ""}</span></a>`; }).join("") || `<p class="muted">Aún no has apuntado vacaciones.</p>`}</section>`;
+  <section>${vs.map((v) => { const t = ymd(), st = v.cerrada ? "" : v.inicio <= t && t <= v.fin ? "ahora" : v.inicio > t ? "próximas" : ""; return `<a class="card vac-row ${st === "ahora" ? "on" : ""}" href="#/vacaciones/${v.id}"><b>🏖 ${esc(v.nombre)}</b><span class="muted small">${fmtRange(v.inicio, v.fin)} · ${(v.notas || []).length} ${(v.notas || []).length === 1 ? "nota" : "notas"}${st ? ` · ${st}` : ""}</span></a>`; }).join("") || `<p class="muted">Aún no has apuntado vacaciones.</p>`}</section>`;
 }
+const vacDayNo = (v, d) => Math.round((dayMs(d) - dayMs(v.inicio)) / DAY) + 1;
+const vacDays = (v) => Math.round((dayMs(v.fin) - dayMs(v.inicio)) / DAY) + 1;
+const vacNotes = (v, d) => (v.notas || []).filter((n) => n.fecha === d).sort((a, b) => (a.creado || 0) - (b.creado || 0));
+function vacEntry(n, v, editable) {
+  const t = vacType(n.tipo);
+  const meta = [n.min && `${n.min} min`, n.km && `${fmt(+n.km)} km`].filter(Boolean).join(" · ");
+  return `<li class="vac-entry"><span class="vac-emoji">${t.emoji}</span><div><b>${esc(t.nombre)}</b>${meta ? ` <span class="muted small">${meta}</span>` : ""}${n.texto ? `<p>${esc(n.texto).replace(/\n/g, "<br>")}</p>` : ""}</div>${editable ? `<button class="icon-btn" data-act="delVacNote" data-id="${v.id}" data-n="${n.id}" aria-label="Borrar">✕</button>` : ""}</li>`;
+}
+function vacHomeCard(v) {
+  const t = ymd(), hoy = vacNotes(v, t);
+  return `<section class="card vac on"><p class="eyebrow">Modo vacaciones · día ${vacDayNo(v, t)} de ${vacDays(v)}</p><h2>🏖 ${esc(v.nombre)}</h2>
+    <p class="small">Tu rutina está en pausa hasta el ${fmtDate(v.fin + "T12:00", { day: "numeric", month: "long" })}. ${hoy.length ? `Hoy llevas ${hoy.length} ${hoy.length === 1 ? "actividad" : "actividades"}.` : "Hoy aún no has apuntado nada."}</p>
+    <a class="btn primary block" href="#/vacaciones/${v.id}">Apuntar lo de hoy</a></section>`;
+}
+// Pantalla de unas vacaciones: antes de empezar solo se ven las fechas; durante, el día de hoy para apuntar
+// actividades (los días pasados quedan guardados, sin cambios); después, el resumen de todos los días.
 function viewVacation(id) {
   const v = store.live("vacations").find((x) => x.id === id);
   if (!v) return `<p class="muted">No encontrado.</p><a class="btn ghost" href="#/vacaciones">Volver</a>`;
-  const t = ymd(), def = t < v.inicio ? v.inicio : t > v.fin ? v.fin : t;
-  const notas = [...(v.notas || [])].sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.creado || 0) - (a.creado || 0));
-  return `<header class="page-h"><a class="link small" href="#/vacaciones">← Vacaciones</a><h1>🏖 ${esc(v.nombre)}</h1><p class="muted">${fmtRange(v.inicio, v.fin)}</p></header>
-  <section class="card"><h3>Apuntar en el diario</h3>
-    <form id="vacNoteForm" class="form" data-id="${v.id}">
-      <label>Día<input type="date" name="fecha" required value="${def}"></label>
-      <label>¿Qué has hecho?<textarea name="texto" rows="3" required maxlength="1000" placeholder="Etapa Sarria – Portomarín, 22 km. Algo de calistenia en el albergue…"></textarea></label>
-      <button class="btn primary block">Guardar nota</button>
-    </form></section>
-  <section><h3>Diario</h3>${notas.map((n) => `<div class="card vac-note"><div class="goal-h"><b>${fmtDate(n.fecha + "T12:00", { weekday: "long", day: "numeric", month: "long" })}</b><button class="icon-btn" data-act="delVacNote" data-id="${v.id}" data-n="${n.id}" aria-label="Borrar nota">✕</button></div><p>${esc(n.texto).replace(/\n/g, "<br>")}</p></div>`).join("") || `<p class="muted">Todavía no hay notas.</p>`}</section>
+  const t = ymd(), now = !v.cerrada && v.inicio <= t && t <= v.fin, future = !v.cerrada && t < v.inicio;
+  const last = now ? ymd(new Date(), -1) : v.fin;
+  const past = [];
+  for (let d = last; d >= v.inicio && past.length < 400; d = ymd(d + "T12:00", -1)) past.push(d);
+  const total = (v.notas || []).length;
+  return `<header class="page-h"><a class="link small" href="#/vacaciones">← Vacaciones</a><h1>🏖 ${esc(v.nombre)}</h1><p class="muted">${fmtRange(v.inicio, v.fin)} · ${vacDays(v)} días${v.cerrada ? " · terminadas antes" : ""}</p></header>
+  ${future ? `<section class="card"><p>Empiezan el <b>${fmtDate(v.inicio + "T12:00", { weekday: "long", day: "numeric", month: "long" })}</b>. Ese día la rutina se pausa y aquí podrás apuntar cada día lo que hagas.</p></section>` : ""}
+  ${now ? `<section class="card vac-today"><p class="eyebrow">Hoy · día ${vacDayNo(v, t)} de ${vacDays(v)}</p><h2>${fmtDate(t + "T12:00", { weekday: "long", day: "numeric", month: "long" })}</h2>
+    ${vacNotes(v, t).length ? `<ul class="plain vac-list">${vacNotes(v, t).map((n) => vacEntry(n, v, true)).join("")}</ul>` : `<p class="muted small">Aún no has apuntado nada. Si no apuntas nada, el día se guarda como día sin actividad.</p>`}
+    <p class="small"><b>Añadir actividad</b></p>
+    <div class="vac-types">${VAC_TYPES.map((x) => `<button class="vac-type" data-act="vacAdd" data-id="${v.id}" data-t="${x.id}"><span>${x.emoji}</span>${esc(x.nombre)}</button>`).join("")}</div>
+    <p class="muted small">Puedes apuntar varias. Al acabar el día se guarda tal cual y pasas al siguiente.</p></section>` : ""}
+  ${past.length && !future ? `<section><h3>${now ? "Días anteriores" : `Resumen · ${total} ${total === 1 ? "actividad" : "actividades"}`}</h3>${past.map((d) => { const ns = vacNotes(v, d); return `<div class="card vac-day ${ns.length ? "" : "empty"}"><b>Día ${vacDayNo(v, d)} · ${fmtDate(d + "T12:00", { weekday: "long", day: "numeric", month: "long" })}</b>${ns.length ? `<ul class="plain vac-list">${ns.map((n) => vacEntry(n, v, false)).join("")}</ul>` : `<p class="muted small">Sin actividad.</p>`}</div>`; }).join("")}</section>` : ""}
+  ${now ? `<button class="btn ghost block" data-act="vacEnd" data-id="${v.id}">Terminar vacaciones y volver a la rutina</button>` : ""}
   <details class="card"><summary>Cambiar nombre o fechas</summary>
     <form id="vacEditForm" class="form" data-id="${v.id}">
       <label>Nombre<input name="nombre" required maxlength="60" value="${esc(v.nombre)}"></label>
@@ -765,6 +799,15 @@ function viewVacation(id) {
     </form>
     <button class="btn danger-ghost block" data-act="delVac" data-id="${v.id}">Borrar estas vacaciones y su diario</button>
   </details>`;
+}
+function vacAddForm(v, tipo) {
+  const t = vacType(tipo);
+  modal(`<h2>${t.emoji} ${esc(t.nombre)}</h2>
+    <form id="vacNoteForm" class="form" data-id="${v.id}" data-t="${t.id}">
+      <div class="two"><label>Minutos<input name="min" type="number" inputmode="numeric" min="0" max="1440" placeholder="opcional"></label>${t.km ? `<label>Km<input name="km" type="number" inputmode="decimal" step="0.1" min="0" max="500" placeholder="opcional"></label>` : ""}</div>
+      <label>Nota<textarea name="texto" rows="3" maxlength="1000" placeholder="${t.id === "caminar" ? "Etapa Sarria – Portomarín" : t.id === "calistenia" ? "3 × 10 flexiones, 3 × 8 dominadas en un parque…" : "Qué has hecho"}"></textarea></label>
+      <button class="btn primary block">Guardar</button>
+    </form>`);
 }
 
 // ---------- fin del entreno: enhorabuena y resultados ----------
@@ -1226,6 +1269,13 @@ const actions = {
   deloadLater: () => { saveSettings({ descargaPospuesta: ymd(new Date(), 7) }); toast("Te lo recuerdo dentro de una semana"); rerenderKeepScroll(); },
   deloadStop: () => { if (confirmBox("¿Terminar ya la semana de descarga?")) { const d = store.get().settings.descarga; saveSettings({ descarga: { ...d, fin: ymd(new Date(), -1) } }); rerenderKeepScroll(); } },
   deloadNow: () => { if (deloadState()) return toast("Ya estás en semana de descarga"); actions.deloadStart(); },
+  vacAdd: (b) => { const v = store.live("vacations").find((x) => x.id === b.dataset.id); if (v) vacAddForm(v, b.dataset.t); },
+  vacEnd: (b) => {
+    if (!confirmBox("¿Terminar las vacaciones y volver a la rutina? Lo apuntado se queda guardado.")) return;
+    const v = store.live("vacations").find((x) => x.id === b.dataset.id);
+    store.upsert("vacations", { ...v, fin: ymd() < v.fin ? ymd() : v.fin, cerrada: true });
+    toast("¡De vuelta a la rutina!"); location.hash = "#/hoy";
+  },
   delVac: (b) => { if (confirmBox("¿Borrar estas vacaciones y todas sus notas?")) { store.remove("vacations", b.dataset.id); location.hash = "#/vacaciones"; } },
   delVacNote: (b) => { if (!confirmBox("¿Borrar esta nota?")) return; const v = store.live("vacations").find((x) => x.id === b.dataset.id); store.upsert("vacations", { ...v, notas: (v.notas || []).filter((n) => n.id !== b.dataset.n) }); rerenderKeepScroll(); },
   alarmTest: () => timer.preview($("#alarmTipo")?.value, +$("#alarmVol")?.value),
@@ -1420,16 +1470,17 @@ document.addEventListener("submit", (ev) => {
     const d = Object.fromEntries(new FormData(f));
     if (d.fin < d.inicio) { toast("La fecha de fin no puede ser anterior a la de inicio"); return; }
     const prev = f.id === "vacEditForm" ? store.live("vacations").find((x) => x.id === f.dataset.id) : { notas: [] };
-    const v = store.upsert("vacations", { ...prev, nombre: d.nombre.trim(), inicio: d.inicio, fin: d.fin });
+    const v = store.upsert("vacations", { ...prev, nombre: d.nombre.trim(), inicio: d.inicio, fin: d.fin, cerrada: f.id === "vacEditForm" && d.fin === prev.fin ? prev.cerrada : undefined });
     toast(f.id === "vacForm" ? "Vacaciones guardadas" : "Cambios guardados");
     if (location.hash === `#/vacaciones/${v.id}`) render(); else location.hash = `#/vacaciones/${v.id}`;
   }
   if (f.id === "vacNoteForm") {
     const d = Object.fromEntries(new FormData(f));
     const v = store.live("vacations").find((x) => x.id === f.dataset.id);
-    if (!v || !d.texto.trim()) return;
-    store.upsert("vacations", { ...v, notas: [...(v.notas || []), { id: store.uid(), fecha: d.fecha, texto: d.texto.trim(), creado: Date.now() }] });
-    toast("Nota guardada"); rerenderKeepScroll();
+    if (!v) return;
+    const n = { id: store.uid(), fecha: ymd(), tipo: f.dataset.t, texto: d.texto.trim(), min: +d.min || undefined, km: +d.km || undefined, creado: Date.now() };
+    store.upsert("vacations", { ...v, notas: [...(v.notas || []), n] });
+    closeModal(); toast("Apuntado"); rerenderKeepScroll();
   }
   if (f.id === "achForm") {
     const d = Object.fromEntries(new FormData(f));

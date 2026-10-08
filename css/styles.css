@@ -429,3 +429,24 @@ html.rot .sheet { max-height: 88vw; }
 .card.deload.on { background: var(--surface-2); }
 .card.deload p { margin: 6px 0; }
 .vac-note p { margin: 6px 0 0; white-space: normal; }
+
+/* v16: campos de fecha que no se salen de la caja (iOS les da un ancho mínimo propio) y vacaciones día a día */
+input, select, textarea { box-sizing: border-box; max-width: 100%; min-width: 0; }
+input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; text-align: left; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+.two > label { min-width: 0; }
+.vac-cta { display: flex; flex-direction: column; gap: 8px; }
+.vac-cta p { margin: 4px 0 0; }
+.card.vac h2 { margin: 2px 0 6px; }
+.vac-today h2 { margin: 2px 0 10px; }
+.vac-today h2::first-letter { text-transform: uppercase; }
+.vac-types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
+.vac-type { display: flex; align-items: center; gap: 8px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; font: inherit; font-size: .88rem; font-weight: 600; color: inherit; cursor: pointer; min-width: 0; }
+.vac-type span { font-size: 1.4rem; }
+.vac-list { margin: 8px 0; }
+.vac-entry { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.vac-entry:last-child { border-bottom: 0; }
+.vac-entry p { margin: 4px 0 0; font-size: .92rem; overflow-wrap: anywhere; }
+.vac-emoji { font-size: 1.5rem; line-height: 1.2; }
+.vac-day.empty { opacity: .7; }
+.vac-day b:first-child { text-transform: none; }

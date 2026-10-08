@@ -32,6 +32,17 @@ export const KG_TIERS = [
 // Notas de versión (la primera es la actual).
 export const CHANGELOG = [
   {
+    version: "16",
+    fecha: "2026-10-08",
+    cambios: [
+      "Vacaciones día a día: al llegar el primer día ves solo el día de hoy y apuntas lo que hagas eligiendo el tipo (caminata, correr, bici, nadar, calistenia, fuerza, deporte, estiramientos…) con minutos, km y una nota. Puedes apuntar varias; al acabar el día se guarda y pasas al siguiente (si no apuntas nada, queda como día sin actividad).",
+      "Mientras estás de vacaciones, Hoy esconde la rutina y muestra el día de vacaciones; al terminar vuelve a aparecer sola.",
+      "Botón «Terminar vacaciones y volver a la rutina» por si acaban antes o puedes seguir entrenando.",
+      "Las vacaciones tienen su propia sección en Hoy, más visible.",
+      "Arreglado: los campos de fecha se salían de la caja en el iPhone.",
+    ],
+  },
+  {
     version: "15",
     fecha: "2026-10-08",
     cambios: [
