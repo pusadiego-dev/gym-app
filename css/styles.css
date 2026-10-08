@@ -420,3 +420,12 @@ html.rot .sheet { max-height: 88vw; }
 .settings input[type="range"] { width: 100%; accent-color: var(--accent); }
 .news ul { padding-left: 18px; }
 .news li { margin: 4px 0; }
+
+/* v15: vacaciones y semana de descarga */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.card.vac, .card.vac-row { display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: inherit; }
+.card.vac.on, .card.vac-row.on { border-color: var(--accent); background: linear-gradient(160deg, var(--accent-soft), var(--surface)); }
+.card.deload { border-color: var(--series-1, var(--accent)); }
+.card.deload.on { background: var(--surface-2); }
+.card.deload p { margin: 6px 0; }
+.vac-note p { margin: 6px 0 0; white-space: normal; }

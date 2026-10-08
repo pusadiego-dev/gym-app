@@ -32,6 +32,15 @@ export const KG_TIERS = [
 // Notas de versión (la primera es la actual).
 export const CHANGELOG = [
   {
+    version: "15",
+    fecha: "2026-10-08",
+    cambios: [
+      "Modo vacaciones: apunta el día que empiezas y el día que acabas (Hoy → «Vacaciones y diario»). Esas semanas no rompen tu racha y al volver sigues con el siguiente entreno.",
+      "Diario de cada viaje con su nombre («Semana Camino», «Viaje a China»…) para anotar lo que haces cada día y consultarlo cuando quieras.",
+      "Semana de descarga: la app te la propone cada 4-6 semanas o si te estancas en varios ejercicios. Durante 7 días hace la mitad de series con un 10 % menos de peso. También puedes empezarla tú desde Ajustes.",
+    ],
+  },
+  {
     version: "14",
     fecha: "2026-10-08",
     cambios: [

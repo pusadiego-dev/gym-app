@@ -1,5 +1,11 @@
 # Notas de versión
 
+## Versión 15 · 8 de octubre de 2026
+
+- **Modo vacaciones:** en Hoy → «Vacaciones y diario» apuntas el día que empiezas y el día que acabas. Esas semanas no rompen la racha de semanas seguidas y al volver la app sigue con el siguiente entreno de tu rutina. Mientras duran, Hoy muestra el aviso de vacaciones.
+- **Diario de viaje:** cada periodo de vacaciones tiene nombre («Semana Camino», «Viaje a China»…) y un diario para anotar lo que haces cada día (etapas, calistenia…) y consultarlo después. Se sincroniza con Drive.
+- **Semana de descarga:** la app la propone tras 6 semanas entrenando, o tras 4 si te estancas en 2 o más ejercicios (contando desde la última descarga o desde unas vacaciones de 5 días o más). Durante 7 días: mitad de series y un 10 % menos de peso; esas sesiones no cuentan para proponer pesos después. También se puede empezar a mano desde Perfil → Ajustes, posponer una semana o terminar antes.
+
 ## Versión 14 · 8 de octubre de 2026
 
 - **Alarma del temporizador:** eliges el sonido (pitidos, campana, reloj digital, silbato, gong o sirena) y el volumen en Perfil → Ajustes, con un botón para probarlo.

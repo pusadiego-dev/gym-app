@@ -22,6 +22,13 @@ const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || ex
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
 const APP_VERSION = CHANGELOG[0].version;
 // Peso corporal en kilos y gramos (dos campos enteros: en iPhone el teclado decimal pone coma y falla).
+// fecha local AAAA-MM-DD (desplazada n días)
+const ymd = (d = new Date(), n = 0) => { const x = new Date(d); x.setDate(x.getDate() + n); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
+const dayMs = (s) => new Date(s + "T00:00:00").getTime();
+const fmtRange = (a, b) => `${fmtDate(a + "T12:00", { day: "numeric", month: "short" })} – ${fmtDate(b + "T12:00", { day: "numeric", month: "short", year: "numeric" })}`;
+const vacations = () => store.live("vacations").sort((a, b) => b.inicio.localeCompare(a.inicio));
+const vacationNow = () => { const t = ymd(); return vacations().find((v) => v.inicio <= t && t <= v.fin); };
+const weekInVacation = (w) => vacations().some((v) => dayMs(v.inicio) < w + 7 * DAY && dayMs(v.fin) + DAY > w);
 const setsDone = (e) => e.sets.filter((x) => x.hecho !== false);
 const volOf = (s) => s.ejercicios.reduce((n, e) => n + setsDone(e).reduce((m, x) => m + (+x.peso || 0) * (+x.reps || 0), 0), 0);
 const liftedTotal = () => store.live("sessions").reduce((n, s) => n + volOf(s), 0);
@@ -136,6 +143,7 @@ function mountAnims(root) {
 // ---------- historial y métricas ----------
 function lastSetsFor(exId, v) {
   for (const s of sessions()) {
+    if (s.descarga) continue; // las sesiones de descarga no cuentan para proponer pesos
     const e = s.ejercicios.find((x) => x.exId === exId && x.variante === v) || s.ejercicios.find((x) => x.exId === exId);
     if (e) return { sets: e.sets, fecha: s.fecha, mismaVariante: e.variante === v };
   }
@@ -284,6 +292,7 @@ function barsVsTarget(done, target) {
 const routes = {
   hoy: viewHome, rutina: viewRoutine, ejercicios: viewExercises, ejercicio: viewExercise, progreso: viewProgress,
   logros: viewAchievements, perfil: viewProfile, formulario: viewForm, entreno: viewWorkout, cardio: viewCardio,
+  vacaciones: viewVacations,
 };
 
 function render() {
@@ -292,7 +301,7 @@ function render() {
   if (!profile && !["formulario", "ejercicios", "ejercicio", "cardio", "perfil"].includes(route)) { location.hash = "#/formulario"; return; }
   if (route === "entreno" && !store.getActive()) { location.hash = "#/hoy"; return; }
   const fn = routes[route] || viewHome;
-  document.querySelectorAll(".tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.r === route || (["ejercicio", "cardio"].includes(route) && a.dataset.r === "ejercicios")));
+  document.querySelectorAll(".tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.r === route || (["ejercicio", "cardio"].includes(route) && a.dataset.r === "ejercicios") || (route === "vacaciones" && a.dataset.r === "hoy")));
   document.body.dataset.route = route;
   view.innerHTML = fn(...args.map(decodeURIComponent));
   mountAnims(view);
@@ -319,12 +328,28 @@ function viewHome() {
   const p = store.obj("profile"), r = store.obj("routine"), active = store.getActive();
   const ss = sessions();
   const wk = ss.filter((s) => new Date(s.fecha).getTime() >= weekStart()).length;
-  const streak = (() => { let n = 0, w = weekStart(); while (ss.some((s) => { const t = new Date(s.fecha).getTime(); return t >= w && t < w + 7 * DAY; })) { n++; w -= 7 * DAY; } return n; })();
+  // racha de semanas con entreno; las semanas de vacaciones no la rompen (ni suman), y la semana actual sin entreno aún tampoco
+  const streak = (() => {
+    let n = 0, w = weekStart();
+    for (let k = 0; k < 520; k++, w -= 7 * DAY) {
+      if (ss.some((s) => { const t = new Date(s.fecha).getTime(); return t >= w && t < w + 7 * DAY; })) n++;
+      else if (!(k === 0 || weekInVacation(w))) break;
+    }
+    return n;
+  })();
+  const vac = vacationNow(), nextVac = !vac && vacations().filter((v) => v.inicio > ymd() && v.inicio <= ymd(new Date(), 14)).pop();
+  const dl = deloadState(), dlSug = !dl && deloadSuggestion();
   const next = r ? nextDayIdx(r) : 0;
   const lastAch = store.live("achievements").sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
   return `
   <header class="page-h hello"><div><p class="muted">${fmtDate(new Date(), { weekday: "long", day: "numeric", month: "long" })}</p><h1>Hola, ${esc(p.nombre || "atleta")}</h1></div><a href="#/perfil" aria-label="Perfil">${avatarHtml(p, "md")}</a></header>
   ${active ? `<a class="card resume" href="#/entreno"><b>Entreno en curso</b><span>${esc(active.diaNombre)} · toca para continuar</span></a>` : ""}
+  ${vac ? `<a class="card vac on" href="#/vacaciones/${vac.id}"><b>🏖 Modo vacaciones: ${esc(vac.nombre)}</b><span class="small">Hasta el ${fmtDate(vac.fin + "T12:00", { day: "numeric", month: "long" })}. Estos días no cuentan como semanas perdidas. Toca para apuntar en el diario.</span></a>`
+    : nextVac ? `<a class="card vac" href="#/vacaciones/${nextVac.id}"><b>🏖 Próximas vacaciones: ${esc(nextVac.nombre)}</b><span class="small muted">${fmtRange(nextVac.inicio, nextVac.fin)}</span></a>` : ""}
+  ${dl ? `<section class="card deload on"><b>🔋 Semana de descarga hasta el ${fmtDate(dl.fin + "T12:00", { day: "numeric", month: "long" })}</b><p class="small">Mitad de series y un 10 % menos de peso para recuperarte. <button class="link" data-act="deloadStop">Terminarla ya</button></p></section>`
+    : dlSug ? `<section class="card deload"><p class="eyebrow">Recomendación</p><b>🔋 Toca semana de descarga</b>
+      <p class="small">Llevas ${dlSug.weeks} semanas entrenando${dlSug.stalled.length ? ` y estás estancado en ${esc(dlSug.stalled.slice(0, 3).join(", "))}` : ""}. Una semana más suave (la mitad de series y un 10 % menos de peso) te ayuda a recuperar y volver más fuerte.</p>
+      <div class="row-btns"><button class="btn primary small" data-act="deloadStart">Empezar descarga (7 días)</button><button class="btn ghost small" data-act="deloadLater">Ahora no</button></div></section>` : ""}
   <div class="stats">
     <div class="stat"><span class="n">${wk}<small>/${r?.dias.length || p.dias}</small></span><span>esta semana</span></div>
     <div class="stat"><span class="n">${streak}</span><span>semanas seguidas</span></div>
@@ -339,6 +364,7 @@ function viewHome() {
     <button class="btn primary block" data-act="start" data-day="${next}" ${active ? "disabled" : ""}>Empezar entreno</button>
   </section>
   <section><h3>Otros días</h3><div class="chips">${r.dias.map((d, i) => i === next ? "" : `<button class="chip" data-act="start" data-day="${i}" ${active ? "disabled" : ""}>${esc(d.nombre)}</button>`).join("")}</div></section>` : `<a class="btn primary block" href="#/formulario">Crear mi rutina</a>`}
+  <div class="chips"><a class="chip" href="#/vacaciones">🏖 Vacaciones y diario</a></div>
   ${lastAch ? `<section class="card ach-mini"><span class="emoji">${lastAch.emoji}</span><div><p class="eyebrow">Último logro</p><b>${esc(lastAch.titulo)}</b></div></section>` : ""}
   ${ss[0] ? `<section><h3>Último entreno</h3>${sessionCard(ss[0])}</section>` : ""}`;
 }
@@ -347,7 +373,7 @@ function sessionCard(s) {
   const vol = s.ejercicios.reduce((n, e) => n + e.sets.filter((x) => x.hecho).reduce((m, x) => m + (+x.peso || 0) * (+x.reps || 0), 0), 0);
   const cmin = cardioMinOf(s);
   const parts = [fmtDate(s.fecha, { weekday: "short", day: "numeric", month: "short" }), `${Math.round((s.duracionSeg || 0) / 60)} min`, sets && `${sets} series`, vol && `${Math.round(vol).toLocaleString("es-ES")} kg`, cmin && `${cmin} min de cardio`].filter(Boolean);
-  return `<button class="card session" data-act="showSession" data-id="${s.id}"><b>${esc(s.diaNombre)}</b><span class="muted small">${parts.join(" · ")}</span></button>`;
+  return `<button class="card session" data-act="showSession" data-id="${s.id}"><b>${esc(s.diaNombre)}${s.descarga ? " · 🔋 descarga" : ""}</b><span class="muted small">${parts.join(" · ")}</span></button>`;
 }
 
 // FORMULARIO DE PERFIL
@@ -537,6 +563,7 @@ function startWorkout(di) {
   const r = store.obj("routine");
   const d = r.dias[di];
   const planKey = `${r.id}:${di}`, plan = store.get().settings?.plan?.[planKey];
+  const deload = !!deloadState();
   const act = {
     id: store.uid(), inicio: Date.now(), diaIdx: di, diaNombre: d.nombre, rutinaId: r.id, rest: null,
     ejercicios: d.ejercicios.map((slot) => {
@@ -544,10 +571,13 @@ function startWorkout(di) {
       const sug = P.suggestion(slot, last?.mismaVariante ? last.sets : null);
       const lastW = last?.mismaVariante ? Math.max(0, ...last.sets.filter((s) => s.hecho).map((s) => +s.peso || 0)) : 0;
       const pp = plan?.pesos?.[`${slot.exId}:${slot.variante}`];
-      const peso = pp ?? sug?.peso ?? (lastW || "");
-      return { exId: slot.exId, variante: slot.variante, slot: { ...slot }, plan: pp != null ? { modo: plan.modo, peso: pp } : undefined, sets: Array.from({ length: slot.series }, () => ({ peso: peso === 0 ? "" : peso, reps: "", seg: "", hecho: false })) };
+      let peso = pp ?? sug?.peso ?? (lastW || "");
+      const series = deload ? Math.max(1, Math.ceil(slot.series / 2)) : slot.series;
+      if (deload && +peso > 0) peso = roundW(+peso * 0.9, byId[slot.exId]);
+      return { exId: slot.exId, variante: slot.variante, slot: { ...slot, series }, plan: pp != null ? { modo: plan.modo, peso: pp } : undefined, sets: Array.from({ length: series }, () => ({ peso: peso === 0 ? "" : peso, reps: "", seg: "", hecho: false })) };
     }),
     cardio: dayCardio(d).map(newCardioEntry),
+    descarga: deload || undefined,
   };
   store.setActive(act);
   if (plan) { const st = store.get().settings || {}, rest = { ...st.plan }; delete rest[planKey]; store.setObject("settings", { ...st, plan: rest }); }
@@ -574,6 +604,7 @@ function viewWorkout() {
   return `
   <header class="page-h workout-h"><div><p class="eyebrow">Entrenando</p><h1>${esc(a.diaNombre)}</h1></div><div class="clock"><span id="elapsed">${timer.mmss((Date.now() - a.inicio) / 1000)}</span><small>${done}/${total} ${unit}</small></div></header>
   <div class="progress"><span style="width:${total ? (done / total) * 100 : 0}%"></span></div>
+  ${a.descarga ? `<p class="sug small">🔋 Semana de descarga: mitad de series y un 10 % menos de peso.</p>` : ""}
   <div class="row-btns"><button class="btn ghost small" data-act="stopwatch">⏱ Cronómetro</button><button class="btn ghost small" data-act="restNow">⏸ Descanso</button></div>
   ${a.ejercicios.map((e, ei) => workoutExercise(e, ei)).join("")}
   ${cardio.map((c, ci) => workoutCardio(c, ci)).join("")}
@@ -659,7 +690,7 @@ function finishWorkout() {
     const now = Math.max(...e.sets.map((s) => e1rm(s.peso, s.reps)));
     if (now > before && before > 0) prs.push({ exId: e.exId, before, now });
   }
-  const sess = store.upsert("sessions", { id: a.id, fecha, duracionSeg: Math.round((Date.now() - a.inicio) / 1000), diaIdx: a.diaIdx, diaNombre: a.diaNombre, rutinaId: a.rutinaId, ejercicios, cardio });
+  const sess = store.upsert("sessions", { id: a.id, fecha, duracionSeg: Math.round((Date.now() - a.inicio) / 1000), diaIdx: a.diaIdx, diaNombre: a.diaNombre, rutinaId: a.rutinaId, ejercicios, cardio, descarga: a.descarga || undefined });
   store.setActive(null);
   timer.stop(false);
   timer.releaseScreen();
@@ -669,6 +700,71 @@ function finishWorkout() {
   // la enhorabuena se abre después de cambiar de vista (al cambiar de vista se cierran los modales)
   window.addEventListener("hashchange", celebrate, { once: true });
   location.hash = "#/hoy";
+}
+
+// ---------- semana de descarga ----------
+function deloadState() {
+  const d = store.get().settings?.descarga, t = ymd();
+  return d && d.inicio <= t && t <= d.fin ? d : null;
+}
+// Ejercicios cuyo mejor 1RM estimado de las 2 últimas sesiones no supera el de las anteriores (mínimo 4 sesiones).
+function stalledExercises(since) {
+  const by = {};
+  for (const s of [...sessions()].reverse()) {
+    if (s.descarga || ymd(s.fecha) <= since) continue;
+    for (const e of s.ejercicios) {
+      const best = Math.max(0, ...e.sets.map((x) => e1rm(+x.peso, +x.reps)));
+      if (best) (by[e.exId] ||= []).push(best);
+    }
+  }
+  return Object.entries(by).filter(([, v]) => v.length >= 4 && Math.max(...v.slice(-2)) <= Math.max(...v.slice(0, -2))).map(([id]) => byId[id]?.nombre || id);
+}
+// Propuesta: 6 semanas entrenando, o 4 si hay 2+ ejercicios estancados, desde la última descarga o unas vacaciones de 5+ días.
+function deloadSuggestion() {
+  const st = store.get().settings || {};
+  if (st.descargaPospuesta && ymd() < st.descargaPospuesta) return null;
+  let since = st.descarga?.fin || "";
+  for (const v of vacations()) if (v.fin < ymd() && (dayMs(v.fin) - dayMs(v.inicio)) / DAY >= 4 && v.fin > since) since = v.fin;
+  const weeks = new Set(store.live("sessions").filter((s) => !s.descarga && ymd(s.fecha) > since).map((s) => weekStart(new Date(s.fecha)))).size;
+  const stalled = weeks >= 4 ? stalledExercises(since) : [];
+  return weeks >= 6 || (weeks >= 4 && stalled.length >= 2) ? { weeks, stalled } : null;
+}
+function saveSettings(patch) { store.setObject("settings", { ...store.get().settings, ...patch }); }
+
+// ---------- vacaciones ----------
+function viewVacations(id) {
+  if (id) return viewVacation(id);
+  const vs = vacations();
+  return `<header class="page-h"><h1>Vacaciones</h1><p class="muted">Apunta cuándo empiezas y acabas. Esos días no cuentan como semanas perdidas y al volver sigues con el siguiente entreno de tu rutina. Cada viaje tiene su diario para anotar lo que hagas.</p></header>
+  <section class="card"><h3>Nuevas vacaciones</h3>
+    <form id="vacForm" class="form">
+      <label>Nombre<input name="nombre" required maxlength="60" placeholder="Semana Camino, Viaje a China…"></label>
+      <div class="two"><label>Empiezo el día<input type="date" name="inicio" required value="${ymd()}"></label><label>Acabo el día<input type="date" name="fin" required value="${ymd(new Date(), 6)}"></label></div>
+      <button class="btn primary block">Guardar vacaciones</button>
+    </form></section>
+  <section>${vs.map((v) => { const t = ymd(), st = v.inicio <= t && t <= v.fin ? "ahora" : v.inicio > t ? "próximas" : ""; return `<a class="card vac-row ${st === "ahora" ? "on" : ""}" href="#/vacaciones/${v.id}"><b>🏖 ${esc(v.nombre)}</b><span class="muted small">${fmtRange(v.inicio, v.fin)} · ${(v.notas || []).length} ${(v.notas || []).length === 1 ? "nota" : "notas"}${st ? ` · ${st}` : ""}</span></a>`; }).join("") || `<p class="muted">Aún no has apuntado vacaciones.</p>`}</section>`;
+}
+function viewVacation(id) {
+  const v = store.live("vacations").find((x) => x.id === id);
+  if (!v) return `<p class="muted">No encontrado.</p><a class="btn ghost" href="#/vacaciones">Volver</a>`;
+  const t = ymd(), def = t < v.inicio ? v.inicio : t > v.fin ? v.fin : t;
+  const notas = [...(v.notas || [])].sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.creado || 0) - (a.creado || 0));
+  return `<header class="page-h"><a class="link small" href="#/vacaciones">← Vacaciones</a><h1>🏖 ${esc(v.nombre)}</h1><p class="muted">${fmtRange(v.inicio, v.fin)}</p></header>
+  <section class="card"><h3>Apuntar en el diario</h3>
+    <form id="vacNoteForm" class="form" data-id="${v.id}">
+      <label>Día<input type="date" name="fecha" required value="${def}"></label>
+      <label>¿Qué has hecho?<textarea name="texto" rows="3" required maxlength="1000" placeholder="Etapa Sarria – Portomarín, 22 km. Algo de calistenia en el albergue…"></textarea></label>
+      <button class="btn primary block">Guardar nota</button>
+    </form></section>
+  <section><h3>Diario</h3>${notas.map((n) => `<div class="card vac-note"><div class="goal-h"><b>${fmtDate(n.fecha + "T12:00", { weekday: "long", day: "numeric", month: "long" })}</b><button class="icon-btn" data-act="delVacNote" data-id="${v.id}" data-n="${n.id}" aria-label="Borrar nota">✕</button></div><p>${esc(n.texto).replace(/\n/g, "<br>")}</p></div>`).join("") || `<p class="muted">Todavía no hay notas.</p>`}</section>
+  <details class="card"><summary>Cambiar nombre o fechas</summary>
+    <form id="vacEditForm" class="form" data-id="${v.id}">
+      <label>Nombre<input name="nombre" required maxlength="60" value="${esc(v.nombre)}"></label>
+      <div class="two"><label>Empiezo el día<input type="date" name="inicio" required value="${v.inicio}"></label><label>Acabo el día<input type="date" name="fin" required value="${v.fin}"></label></div>
+      <button class="btn ghost block">Guardar cambios</button>
+    </form>
+    <button class="btn danger-ghost block" data-act="delVac" data-id="${v.id}">Borrar estas vacaciones y su diario</button>
+  </details>`;
 }
 
 // ---------- fin del entreno: enhorabuena y resultados ----------
@@ -752,6 +848,7 @@ function buildResults(a, s, extra) {
     if (!c.hecho) review.push(`No hiciste el cardio: ${cardioName(c)} (${c.min} min).`);
     else if (+c.real.min && +c.real.min < c.min) review.push(`${cardioName(c)}: ${c.real.min} de ${c.min} min.`);
   }
+  if (a.descarga) { tips.length = 0; for (const k in plan) delete plan[k]; tips.push({ nm: "Semana de descarga", tipo: "ok", txt: "Esta semana toca recuperar: no se proponen subidas de peso. Al terminar la descarga vuelves a tus pesos normales." }); }
   return { s, V, prev, prevV: prev ? volOf(prev) : 0, week, total: liftedTotal(), kcal, kcalEx, kcalCardio, review, tips, plan, same, planKey: `${s.rutinaId}:${s.diaIdx}`, ...extra };
 }
 
@@ -965,7 +1062,10 @@ function settingsHtml() {
     <label>Volumen de la alarma: <output id="alarmVolOut">${al.vol} %</output><input id="alarmVol" type="range" min="5" max="100" step="5" value="${al.vol}" data-act-change="alarm"></label>
     <button class="btn ghost small" data-act="alarmTest">🔔 Probar sonido</button>
     <label class="switch"><input type="checkbox" id="alarmFondo" data-act-change="alarm" ${al.fondo ? "checked" : ""}> Avisar también con la app en segundo plano</label>
-    <p class="muted small">Al empezar un descanso se reproduce una pista de audio con la alarma al final, así suena aunque cambies de app o bloquees el móvil, y lo verás en la pantalla de bloqueo. Mientras dura puede pausar la música de otras apps. La app no puede abrirse sola: toca el aviso para volver. El volumen también depende del volumen del móvil.</p>
+    <p class="muted small" style="margin-bottom:0">Al empezar un descanso se reproduce una pista de audio con la alarma al final, así suena aunque cambies de app o bloquees el móvil, y lo verás en la pantalla de bloqueo. Mientras dura puede pausar la música de otras apps. La app no puede abrirse sola: toca el aviso para volver. El volumen también depende del volumen del móvil.</p>
+    <h3 style="margin-top:16px">Semana de descarga</h3>
+    <p class="muted small">La app te la propone cada 4-6 semanas o si te estancas: mitad de series y un 10 % menos de peso durante 7 días.</p>
+    <button class="btn ghost small" data-act="deloadNow">🔋 Empezar semana de descarga ahora</button>
   </section>`;
 }
 function newsHtml() {
@@ -1122,6 +1222,12 @@ const actions = {
   stopwatch: () => { timer.unlockAudio(); timer.startWork({ label: "Cronómetro" }); },
   restNow: () => { timer.unlockAudio(); const r = timer.startRest(90, "Descanso"); updateActive((a) => (a.rest = r), false); },
   showResults,
+  deloadStart: () => { saveSettings({ descarga: { inicio: ymd(), fin: ymd(new Date(), 6) } }); toast("Semana de descarga activada: mitad de series y −10 % de peso"); rerenderKeepScroll(); },
+  deloadLater: () => { saveSettings({ descargaPospuesta: ymd(new Date(), 7) }); toast("Te lo recuerdo dentro de una semana"); rerenderKeepScroll(); },
+  deloadStop: () => { if (confirmBox("¿Terminar ya la semana de descarga?")) { const d = store.get().settings.descarga; saveSettings({ descarga: { ...d, fin: ymd(new Date(), -1) } }); rerenderKeepScroll(); } },
+  deloadNow: () => { if (deloadState()) return toast("Ya estás en semana de descarga"); actions.deloadStart(); },
+  delVac: (b) => { if (confirmBox("¿Borrar estas vacaciones y todas sus notas?")) { store.remove("vacations", b.dataset.id); location.hash = "#/vacaciones"; } },
+  delVacNote: (b) => { if (!confirmBox("¿Borrar esta nota?")) return; const v = store.live("vacations").find((x) => x.id === b.dataset.id); store.upsert("vacations", { ...v, notas: (v.notas || []).filter((n) => n.id !== b.dataset.n) }); rerenderKeepScroll(); },
   alarmTest: () => timer.preview($("#alarmTipo")?.value, +$("#alarmVol")?.value),
   planNext: (b) => {
     const r = lastResult;
@@ -1309,6 +1415,21 @@ document.addEventListener("submit", (ev) => {
     }
     toast(first ? "¡Rutina creada!" : "Rutina regenerada");
     location.hash = "#/rutina";
+  }
+  if (f.id === "vacForm" || f.id === "vacEditForm") {
+    const d = Object.fromEntries(new FormData(f));
+    if (d.fin < d.inicio) { toast("La fecha de fin no puede ser anterior a la de inicio"); return; }
+    const prev = f.id === "vacEditForm" ? store.live("vacations").find((x) => x.id === f.dataset.id) : { notas: [] };
+    const v = store.upsert("vacations", { ...prev, nombre: d.nombre.trim(), inicio: d.inicio, fin: d.fin });
+    toast(f.id === "vacForm" ? "Vacaciones guardadas" : "Cambios guardados");
+    if (location.hash === `#/vacaciones/${v.id}`) render(); else location.hash = `#/vacaciones/${v.id}`;
+  }
+  if (f.id === "vacNoteForm") {
+    const d = Object.fromEntries(new FormData(f));
+    const v = store.live("vacations").find((x) => x.id === f.dataset.id);
+    if (!v || !d.texto.trim()) return;
+    store.upsert("vacations", { ...v, notas: [...(v.notas || []), { id: store.uid(), fecha: d.fecha, texto: d.texto.trim(), creado: Date.now() }] });
+    toast("Nota guardada"); rerenderKeepScroll();
   }
   if (f.id === "achForm") {
     const d = Object.fromEntries(new FormData(f));

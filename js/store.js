@@ -1,10 +1,10 @@
 // Estado de la app: se guarda en localStorage y se fusiona con la copia de Google Drive.
 const KEY = "gymapp:data";
 const ACTIVE_KEY = "gymapp:active"; // entreno en curso (solo en este dispositivo)
-const COLLECTIONS = ["sessions", "achievements", "goals", "bodyweight"];
+const COLLECTIONS = ["sessions", "achievements", "goals", "bodyweight", "vacations"];
 const OBJECTS = ["profile", "routine", "settings"];
 
-const empty = () => ({ version: 1, resetAt: 0, profile: null, routine: null, settings: { sonido: true, updatedAt: 0 }, sessions: [], achievements: [], goals: [], bodyweight: [] });
+const empty = () => ({ version: 1, resetAt: 0, profile: null, routine: null, settings: { sonido: true, updatedAt: 0 }, sessions: [], achievements: [], goals: [], bodyweight: [], vacations: [] });
 
 const listeners = new Set();
 let state = load();
