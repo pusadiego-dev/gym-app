@@ -18,7 +18,7 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
-const APP_VERSION = "10";
+const APP_VERSION = "11";
 const cardioName = (c) => cardioById[c.cardioId]?.nombre || c.cardioId;
 const cardioLine = (c) => `${cardioName(c)} · ${CARDIO_MODES[c.modo]?.corto || ""} · ${c.min} min`;
 const dayCardio = (d) => d.cardio || [];
@@ -949,27 +949,36 @@ const actions = {
   themePreset: (b) => saveTheme({ preset: b.dataset.v }),
   themeNeutral: () => saveTheme({ preset: "custom", fondo: null, _keep: 1 }),
   removeAvatar: () => { store.setObject("profile", { ...store.obj("profile"), avatar: null }); render(); },
-  wipe: () => modal(`<h2>Borrar datos</h2>
-    <button class="btn danger-ghost block" data-act="wipeLocal">Solo de este dispositivo</button>
-    <p class="small muted">Para dejar el móvil a otra persona. ${drive.wasConnected() ? "Tu copia de Google Drive se conserva y vuelve si te conectas otra vez." : ""}</p>
-    ${drive.clientId() ? `<button class="btn danger block" data-act="wipeAll">Todo, también en Google Drive</button>
-    <p class="small muted">Empieza de cero: borra entrenos, progreso, rutina, perfil, objetivos y logros aquí, en tu Drive y en tus otros dispositivos.${drive.wasConnected() ? "" : " Te pediremos que entres con Google."}</p>` : ""}`),
+  wipe: () => {
+    const who = drive.owner() || drive.getUser()?.email || "";
+    modal(`<h2>Borrar datos</h2>
+    ${who ? `<p class="small">Datos de <b>${esc(who)}</b> en este móvil.</p>` : ""}
+    <button class="btn danger-ghost block" data-act="wipeLocal">Borrar solo de este móvil</button>
+    <p class="small muted">Para dejar el móvil a otra persona: se cierra tu sesión de Google y ${drive.wasConnected() ? "tu copia en Drive se conserva; vuelve si te conectas otra vez." : "los datos se pierden (no hay copia en Drive)."}</p>
+    ${drive.clientId() ? `<button class="btn danger block" data-act="wipeAll">Borrar todo${who ? ` de ${esc(who)}` : ""}</button>
+    <p class="small muted">Empiezas de cero: se borran entrenos, progreso, rutina, perfil, objetivos y logros en este móvil, en tu Google Drive y en tus otros dispositivos. No se puede deshacer.${drive.hasToken() ? "" : " Se abrirá Google para confirmar que eres tú."}</p>` : ""}`);
+  },
   wipeLocal: () => {
-    if (!confirmBox("¿Borrar los datos de este dispositivo?")) return;
     timer.stop(false);
     drive.disconnect();
+    drive.forgetOwner();
     store.wipe(false);
     closeModal();
+    toast("Datos borrados de este móvil");
     location.hash = "#/formulario";
   },
   wipeAll: async () => {
-    if (!confirmBox("¿Borrar TODOS tus datos, también los de Google Drive y tus otros dispositivos? No se puede deshacer.")) return;
+    const who = drive.owner();
     timer.stop(false);
-    store.wipe(true);
     closeModal();
-    try { if (drive.hasToken()) await drive.sync(); else await drive.connect(); toast("Datos borrados en todos tus dispositivos"); }
-    catch (e) { toast("Borrado aquí. Para borrar también en Drive, vuelve a conectar con Google: " + e.message); }
-    location.hash = "#/formulario"; render();
+    try {
+      // con la sesión caducada primero se confirma la cuenta y luego se borra (nunca la de otra persona)
+      if (drive.hasToken() && (!who || drive.getUser()?.email === who)) { store.wipe(true); await drive.sync(); }
+      else await drive.connect({ expect: who || undefined, beforeSync: () => store.wipe(true) });
+      toast(`Borrado todo${drive.getUser()?.email ? ` de ${drive.getUser().email}` : ""}: en este móvil, en Drive y en tus otros dispositivos`);
+      location.hash = "#/formulario";
+    } catch (e) { toast(e.message); }
+    render();
   },
   export: () => {
     const blob = new Blob([store.exportJson()], { type: "application/json" });

@@ -11,6 +11,10 @@ const FILE = "gymapp-data.json";
 const TOKEN_KEY = "gymapp:token";
 const CONNECTED_KEY = "gymapp:driveConnected";
 const CID_KEY = "gymapp:clientId";
+// Cuenta de Google a la que pertenecen los datos guardados en este dispositivo.
+const OWNER_KEY = "gymapp:owner";
+export const owner = () => localStorage.getItem(OWNER_KEY) || "";
+export const forgetOwner = () => localStorage.removeItem(OWNER_KEY);
 
 let token = null;
 let tokenClient = null;
@@ -32,6 +36,7 @@ async function fetchUser() {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch {}
 }
+if (!owner() && getUser()?.email) localStorage.setItem(OWNER_KEY, getUser().email);
 export const wasConnected = () => localStorage.getItem(CONNECTED_KEY) === "1";
 export const getStatus = () => status;
 export const onStatus = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
@@ -60,7 +65,11 @@ function loadGis() {
 }
 
 // Debe llamarse desde un toque del usuario (abre la ventana de Google).
-export async function connect() {
+// opts.expect: correo que debe usarse (si entra otra cuenta, no se toca nada).
+// opts.beforeSync: se ejecuta tras comprobar la cuenta y antes de sincronizar.
+// Si entra una cuenta distinta de la dueña de los datos locales, esos datos se quitan de este
+// dispositivo (siguen en el Drive de su dueño) para no mezclar las cuentas.
+export async function connect(opts = {}) {
   if (!clientId()) throw new Error("Falta el ID de cliente de Google (ver Perfil → Sincronización).");
   await loadGis();
   return new Promise((resolve, reject) => {
@@ -80,11 +89,21 @@ export async function connect() {
         localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
         localStorage.setItem(CONNECTED_KEY, "1");
         await fetchUser();
-        try { await sync(); resolve(); } catch (e) { reject(e); }
+        const email = getUser()?.email || "";
+        if (opts.expect && email && email !== opts.expect) {
+          google.accounts.oauth2.revoke(resp.access_token, () => {});
+          token = null; localStorage.removeItem(TOKEN_KEY);
+          setStatus("expired", "Toca para sincronizar");
+          return reject(new Error(`Has entrado con ${email}, pero los datos son de ${opts.expect}. No se ha borrado nada.`));
+        }
+        if (email && owner() && owner() !== email) { store.wipe(false); fileId = null; }
+        if (email) localStorage.setItem(OWNER_KEY, email);
+        try { opts.beforeSync?.(); await sync(); resolve(); } catch (e) { reject(e); }
       },
       error_callback: (e) => { setStatus(wasConnected() ? "expired" : "off", "No se completó el inicio de sesión"); reject(new Error(e?.message || "Ventana cerrada")); },
     });
-    tokenClient.requestAccessToken({ prompt: wasConnected() ? "" : "consent" });
+    const hint = opts.expect || owner();
+    tokenClient.requestAccessToken({ prompt: wasConnected() ? "" : "consent", ...(hint ? { login_hint: hint } : {}) });
   });
 }
 
