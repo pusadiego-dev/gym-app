@@ -5,6 +5,7 @@ import * as store from "./store.js";
 import * as drive from "./drive.js";
 import * as timer from "./timer.js";
 import * as theme from "./theme.js";
+import { ADMIN_EMAILS } from "./config.js";
 import { CARDIO, cardioById, CARDIO_MODES, isInterval, intervalMinutes, intervalPhases, hrRange } from "./cardio.js";
 
 const { fmt, e1rm } = P;
@@ -18,7 +19,7 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
-const APP_VERSION = "12";
+const APP_VERSION = "13";
 // Peso corporal en kilos y gramos (dos campos enteros: en iPhone el teclado decimal pone coma y falla).
 const kgFmt = (n) => (Math.round(+n * 1000) / 1000).toString().replace(".", ",");
 function kgInputs(name, value, required = false) {
@@ -26,6 +27,7 @@ function kgInputs(name, value, required = false) {
   return `<span class="kg-g"><input name="${name}_kg" type="number" inputmode="numeric" min="20" max="300" step="1" placeholder="kg" value="${kg}" ${required ? "required" : ""} aria-label="Kilos"><small>kg</small><input name="${name}_g" type="number" inputmode="numeric" min="0" max="999" step="1" placeholder="g" value="${g === 0 && kg !== "" ? "" : g}" aria-label="Gramos"><small>g</small></span>`;
 }
 const readKg = (fd, name) => { const kg = +fd.get(name + "_kg") || 0, g = Math.min(999, Math.max(0, +fd.get(name + "_g") || 0)); return kg ? Math.round((kg + g / 1000) * 1000) / 1000 : ""; };
+const canWipeAll = (email) => ADMIN_EMAILS.includes((email || "").toLowerCase());
 const cardioName = (c) => cardioById[c.cardioId]?.nombre || c.cardioId;
 const cardioLine = (c) => `${cardioName(c)} · ${CARDIO_MODES[c.modo]?.corto || ""} · ${c.min} min`;
 const dayCardio = (d) => d.cardio || [];
@@ -964,7 +966,7 @@ const actions = {
     ${who ? `<p class="small">Datos de <b>${esc(who)}</b> en este móvil.</p>` : ""}
     <button class="btn danger-ghost block" data-act="wipeLocal">Borrar solo de este móvil</button>
     <p class="small muted">Para dejar el móvil a otra persona: se cierra tu sesión de Google y ${drive.wasConnected() ? "tu copia en Drive se conserva; vuelve si te conectas otra vez." : "los datos se pierden (no hay copia en Drive)."}</p>
-    ${drive.clientId() ? `<button class="btn danger block" data-act="wipeAll">Borrar todo${who ? ` de ${esc(who)}` : ""}</button>
+    ${drive.clientId() && canWipeAll(who) ? `<button class="btn danger block" data-act="wipeAll">Borrar todo${who ? ` de ${esc(who)}` : ""}</button>
     <p class="small muted">Empiezas de cero: se borran entrenos, progreso, rutina, perfil, objetivos y logros en este móvil, en tu Google Drive y en tus otros dispositivos. No se puede deshacer.${drive.hasToken() ? "" : " Se abrirá Google para confirmar que eres tú."}</p>` : ""}`);
   },
   wipeLocal: () => {
@@ -978,6 +980,7 @@ const actions = {
   },
   wipeAll: async () => {
     const who = drive.owner();
+    if (!canWipeAll(who || drive.getUser()?.email)) return;
     timer.stop(false);
     closeModal();
     try {
