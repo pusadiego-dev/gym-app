@@ -32,6 +32,11 @@ export const KG_TIERS = [
 // Notas de versión (la primera es la actual).
 export const CHANGELOG = [
   {
+    version: "21",
+    fecha: "2026-10-08",
+    cambios: ["En Perfil → Mi rutina: «Borrar mi rutina y empezar de cero». Pide confirmación, conserva tus entrenos, progreso y logros, y te deja montar una nueva tú mismo o que la cree la app."],
+  },
+  {
     version: "20",
     fecha: "2026-10-08",
     cambios: [

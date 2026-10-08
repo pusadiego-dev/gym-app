@@ -1,5 +1,9 @@
 # Notas de versión
 
+## Versión 21 · 8 de octubre de 2026
+
+- **Borrar mi rutina y empezar de cero** (Perfil → Mi rutina): pide confirmación, borra solo la rutina (entrenos, progreso, logros y vacaciones se conservan) y luego eliges entre montarla tú («Ya tengo una rutina») o que la app la genere a partir de tu perfil. Si no hay entreno en curso.
+
 ## Versión 20 · 8 de octubre de 2026
 
 - **«Ya tengo una rutina»:** al crear la cuenta se puede elegir entre que la app genere la rutina o montarla uno mismo. Se marcan los días de la semana y qué se entrena cada día (pecho y tríceps, espalda y bíceps, pierna, hombro, brazos, torso, empuje, tirón, cuerpo completo, core, cardio o los músculos que se elijan) y después se añaden los ejercicios.

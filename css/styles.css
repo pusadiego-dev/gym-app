@@ -470,3 +470,4 @@ html.rot body { min-height: 0; }
 .day-tools { display: flex; align-items: center; gap: 4px; }
 #pickList .eyebrow { margin: 8px 0 0; }
 [data-custom][hidden], [data-dayopts][hidden] { display: none !important; }
+a.opt-btn { text-decoration: none; }

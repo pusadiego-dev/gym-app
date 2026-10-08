@@ -382,7 +382,7 @@ function viewHome() {
     <ul class="mini-list">${r.dias[next].ejercicios.map((e) => `<li>${esc(exName(e.exId, e.variante))} <span class="muted">${e.series}×${e.tiempo ? `${e.repMin}-${e.repMax} s` : `${e.repMin}-${e.repMax}`}</span></li>`).join("")}${dayCardio(r.dias[next]).map((c) => `<li>${esc(cardioName(c))} <span class="muted">${esc(CARDIO_MODES[c.modo]?.corto)} · ${c.min} min</span></li>`).join("")}</ul>
     <button class="btn primary block" data-act="start" data-day="${next}" ${active ? "disabled" : ""}>Empezar entreno</button>
   </section>
-  <section><h3>Otros días</h3><div class="chips">${r.dias.map((d, i) => i === next ? "" : `<button class="chip" data-act="start" data-day="${i}" ${active ? "disabled" : ""}>${esc(d.nombre)}</button>`).join("")}</div></section>` : `<a class="btn primary block" href="#/formulario">Crear mi rutina</a>`}
+  <section><h3>Otros días</h3><div class="chips">${r.dias.map((d, i) => i === next ? "" : `<button class="chip" data-act="start" data-day="${i}" ${active ? "disabled" : ""}>${esc(d.nombre)}</button>`).join("")}</div></section>` : `<section class="card"><h3>No tienes rutina</h3><p class="muted small">Configura una nueva para empezar a entrenar.</p><button class="btn primary block" data-act="newRoutine">Configurar rutina</button></section>`}
   ${vac ? "" : `<section class="card vac-cta"><div><b>🏖 Vacaciones</b><p class="small muted">${nextVac ? `Próximas: <b>${esc(nextVac.nombre)}</b>, ${fmtRange(nextVac.inicio, nextVac.fin)}. La rutina se pausa esos días.` : "¿Te vas de viaje? Marca las fechas: la rutina se pausa y cada día apuntas lo que hagas."}</p></div>
     <div class="row-btns"><a class="btn primary small" href="#/vacaciones">${nextVac ? "Ver vacaciones" : "+ Añadir vacaciones"}</a></div></section>`}
   ${lastAch ? `<section class="card ach-mini"><span class="emoji">${lastAch.emoji}</span><div><p class="eyebrow">Último logro</p><b>${esc(lastAch.titulo)}</b></div></section>` : ""}
@@ -1159,6 +1159,10 @@ function viewProfile() {
     <button class="btn danger-ghost small" data-act="wipe">Borrar datos…</button>
   </section>
   ${appearanceHtml()}
+  ${p ? `<section class="card"><h3>Mi rutina</h3>
+    <p class="muted small">${store.obj("routine") ? `Ahora tienes «${esc(store.obj("routine").nombre)}» (${store.obj("routine").dias.length} días${store.obj("routine").propia ? ", montada por ti" : ", creada por la app"}). Tu historial de entrenos se conserva aunque la borres.` : "No tienes rutina configurada."}</p>
+    ${store.obj("routine") ? `<button class="btn danger-ghost block" data-act="resetRoutine">Borrar mi rutina y empezar de cero</button>` : `<button class="btn primary block" data-act="newRoutine">Configurar una rutina nueva</button>`}
+  </section>` : ""}
   ${settingsHtml()}
   ${newsHtml()}
   <section class="card"><h3>Referencias científicas</h3><ol class="refs small">${P.REFERENCES.map((r) => `<li>${esc(r)}</li>`).join("")}</ol>
@@ -1333,6 +1337,17 @@ const actions = {
   stopwatch: () => { timer.unlockAudio(); timer.startWork({ label: "Cronómetro" }); },
   restNow: () => { timer.unlockAudio(); const r = timer.startRest(90, "Descanso"); updateActive((a) => (a.rest = r), false); },
   showResults,
+  resetRoutine: () => {
+    if (store.getActive()) return toast("Termina o descarta primero el entreno en curso");
+    if (!confirmBox("¿Borrar tu rutina actual? Tus entrenos, progreso y logros se conservan. Después configuras una nueva.")) return;
+    const st = store.get().settings || {};
+    store.setObject("settings", { ...st, plan: {} });
+    store.setObject("routine", null);
+    actions.newRoutine();
+  },
+  newRoutine: () => modal(`<h2>Rutina nueva</h2><p class="muted small">¿Cómo quieres empezar?</p>
+    <div class="opt-list"><a class="opt-btn" href="#/montar" data-act="closeModal"><span><b>Ya tengo una rutina: la monto yo</b><small>Eliges los días y qué entrenas cada día, y añades tus ejercicios.</small></span></a>
+    <a class="opt-btn" href="#/formulario" data-act="closeModal"><span><b>Que me la cree la app</b><small>Revisa tu perfil (días, objetivo, material…) y la app genera una con base científica.</small></span></a></div>`),
   renameDay: (b) => { const r = store.obj("routine"), d = r.dias[+b.dataset.day]; const n = prompt("Nombre del día", d.nombre); if (n && n.trim()) editRoutine((x) => (x.dias[+b.dataset.day].nombre = n.trim().slice(0, 60))); },
   removeDay: (b) => { const d = store.obj("routine").dias[+b.dataset.day]; if (store.obj("routine").dias.length <= 1) return toast("La rutina necesita al menos un día"); if (confirmBox(`¿Quitar «${d.nombre}» de la rutina?`)) editRoutine((x) => x.dias.splice(+b.dataset.day, 1)); },
   addDay: () => modal(`<h2>Añadir día</h2><form id="dayForm" class="form">${dayFields("nd")}<button class="btn primary block">Añadir</button></form>`, bindDayFields),
