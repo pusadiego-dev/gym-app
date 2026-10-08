@@ -32,6 +32,11 @@ export const KG_TIERS = [
 // Notas de versión (la primera es la actual).
 export const CHANGELOG = [
   {
+    version: "19",
+    fecha: "2026-10-08",
+    cambios: ["El menú inferior queda más pegado al borde del iPhone: menos espacio vacío bajo los iconos."],
+  },
+  {
     version: "18",
     fecha: "2026-10-08",
     cambios: ["Arreglado (segundo intento): el menú inferior se ajusta al borde real de la pantalla del iPhone y la página ocupa siempre la pantalla entera, aunque tenga poco contenido."],

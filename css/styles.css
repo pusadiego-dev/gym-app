@@ -458,3 +458,7 @@ html { min-height: 100%; background: var(--bg); }
 .tabbar { transform: translateY(var(--vv-fix, 0px)); }
 body { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; }
 html.rot body { min-height: 0; }
+/* menos margen bajo los iconos: se usa algo más de la mitad de la zona segura del iPhone (la barra de inicio sigue libre) */
+:root { --tab-pad: calc(var(--safe-b) * 0.55); }
+.tabbar { height: calc(56px + var(--tab-pad)); padding-bottom: var(--tab-pad); align-items: stretch; }
+.tabbar a { justify-content: center; padding-top: 4px; }
