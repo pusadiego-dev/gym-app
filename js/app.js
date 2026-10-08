@@ -18,7 +18,14 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
-const APP_VERSION = "11";
+const APP_VERSION = "12";
+// Peso corporal en kilos y gramos (dos campos enteros: en iPhone el teclado decimal pone coma y falla).
+const kgFmt = (n) => (Math.round(+n * 1000) / 1000).toString().replace(".", ",");
+function kgInputs(name, value, required = false) {
+  const v = +value || 0, kg = v ? Math.floor(v + 1e-9) : "", g = v ? Math.round((v - Math.floor(v + 1e-9)) * 1000) : "";
+  return `<span class="kg-g"><input name="${name}_kg" type="number" inputmode="numeric" min="20" max="300" step="1" placeholder="kg" value="${kg}" ${required ? "required" : ""} aria-label="Kilos"><small>kg</small><input name="${name}_g" type="number" inputmode="numeric" min="0" max="999" step="1" placeholder="g" value="${g === 0 && kg !== "" ? "" : g}" aria-label="Gramos"><small>g</small></span>`;
+}
+const readKg = (fd, name) => { const kg = +fd.get(name + "_kg") || 0, g = Math.min(999, Math.max(0, +fd.get(name + "_g") || 0)); return kg ? Math.round((kg + g / 1000) * 1000) / 1000 : ""; };
 const cardioName = (c) => cardioById[c.cardioId]?.nombre || c.cardioId;
 const cardioLine = (c) => `${cardioName(c)} · ${CARDIO_MODES[c.modo]?.corto || ""} · ${c.min} min`;
 const dayCardio = (d) => d.cardio || [];
@@ -190,7 +197,7 @@ function goalProgress(g) {
     const start = g.inicio || bw?.kg || g.valor;
     if (!bw) return { pct: 0, txt: "Registra tu peso en Progreso" };
     const pct = start === g.valor ? 1 : (start - bw.kg) / (start - g.valor);
-    return { pct: Math.max(0, pct), txt: `Actual: ${fmt(bw.kg)} kg (inicio ${fmt(start)} kg)` };
+    return { pct: Math.max(0, pct), txt: `Actual: ${kgFmt(bw.kg)} kg (inicio ${kgFmt(start)} kg)` };
   }
   return { pct: g.cumplido ? 1 : 0, txt: g.cumplido ? "Conseguido" : "Márcalo cuando lo consigas" };
 }
@@ -198,7 +205,7 @@ function goalTitle(g) {
   if (g.tipo === "ejercicio") return `${byId[g.exId]?.nombre || g.exId}: ${fmt(g.valor)} kg${g.reps > 1 ? ` × ${g.reps}` : ""}`;
   if (g.tipo === "sesiones") return `Completar ${g.valor} entrenamientos`;
   if (g.tipo === "cardio") return `Acumular ${g.valor} min de cardio`;
-  if (g.tipo === "peso_corporal") return `Llegar a ${fmt(g.valor)} kg de peso corporal`;
+  if (g.tipo === "peso_corporal") return `Llegar a ${kgFmt(g.valor)} kg de peso corporal`;
   return g.texto;
 }
 function checkGoals() {
@@ -211,7 +218,8 @@ function checkGoals() {
 }
 
 // ---------- gráficos ----------
-function lineChart(points, { unit = "kg", label = "" } = {}) {
+function lineChart(points, { unit = "kg", label = "", precise = false } = {}) {
+  const nf = precise ? kgFmt : fmt;
   if (points.length < 2) return `<p class="muted small">Necesitas al menos 2 registros para ver la gráfica.</p>`;
   const W = 340, H = 180, pl = 36, pr = 12, pt = 12, pb = 26;
   const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
@@ -224,13 +232,13 @@ function lineChart(points, { unit = "kg", label = "" } = {}) {
   const d = points.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
   const last = points[points.length - 1];
   const data = esc(JSON.stringify(points.map((p) => ({ x: X(p.x), y: Y(p.y), v: p.y, d: p.x, t: p.top ? `${fmt(p.top.peso)} kg × ${p.top.reps}` : "" }))));
-  return `<div class="chart" data-points="${data}" data-unit="${unit}">
+  return `<div class="chart" data-points="${data}" data-unit="${unit}" ${precise ? "data-precise" : ""}>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">
       ${ticks.map((t) => `<line x1="${pl}" x2="${W - pr}" y1="${Y(t)}" y2="${Y(t)}" class="grid"/><text x="${pl - 6}" y="${Y(t) + 3}" class="axis" text-anchor="end">${Math.round(t)}</text>`).join("")}
       <text x="${pl}" y="${H - 6}" class="axis">${fmtDate(x0)}</text><text x="${W - pr}" y="${H - 6}" class="axis" text-anchor="end">${fmtDate(x1)}</text>
       <path d="${d}" class="line"/>
       ${points.map((p) => `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="4" class="dot"/>`).join("")}
-      <text x="${X(last.x) - 4}" y="${Y(last.y) - 9}" class="lbl" text-anchor="end">${fmt(last.y)} ${unit}</text>
+      <text x="${X(last.x) - 4}" y="${Y(last.y) - 9}" class="lbl" text-anchor="end">${nf(last.y)} ${unit}</text>
       <line class="xhair" y1="${pt}" y2="${H - pb}" x1="-10" x2="-10"/>
     </svg><div class="tip" hidden></div></div>`;
 }
@@ -243,7 +251,7 @@ function bindCharts(root) {
       const p = pts.reduce((a, b) => (Math.abs(b.x - x) < Math.abs(a.x - x) ? b : a));
       xh.setAttribute("x1", p.x); xh.setAttribute("x2", p.x);
       tip.hidden = false;
-      tip.innerHTML = `<b>${fmt(p.v)} ${c.dataset.unit}</b><br>${fmtDate(p.d, { day: "numeric", month: "short", year: "numeric" })}${p.t ? `<br>${p.t}` : ""}`;
+      tip.innerHTML = `<b>${("precise" in c.dataset ? kgFmt : fmt)(p.v)} ${c.dataset.unit}</b><br>${fmtDate(p.d, { day: "numeric", month: "short", year: "numeric" })}${p.t ? `<br>${p.t}` : ""}`;
       tip.style.left = `${Math.min(r.width - 120, Math.max(0, (p.x / svg.viewBox.baseVal.width) * r.width - 60))}px`;
     };
     svg.addEventListener("pointermove", move);
@@ -355,7 +363,7 @@ function viewForm() {
       <label>Nombre<input name="nombre" required value="${esc(p.nombre)}" autocomplete="given-name"></label>
       <div class="row3">
         <label>Edad<input name="edad" type="number" inputmode="numeric" min="12" max="100" value="${esc(p.edad)}"></label>
-        <label>Peso (kg)<input name="peso" type="number" inputmode="decimal" step="0.1" min="30" max="300" value="${esc(p.peso)}"></label>
+        <label>Peso${kgInputs("peso", p.peso)}</label>
         <label>Altura (cm)<input name="altura" type="number" inputmode="numeric" min="120" max="230" value="${esc(p.altura)}"></label>
       </div>
       <label>Sexo<select name="sexo"><option value="">Prefiero no decirlo</option><option value="h" ${p.sexo === "h" ? "selected" : ""}>Hombre</option><option value="m" ${p.sexo === "m" ? "selected" : ""}>Mujer</option></select></label>
@@ -379,7 +387,8 @@ function viewForm() {
 }
 function readForm(form) {
   const fd = new FormData(form);
-  const o = Object.fromEntries([...fd.entries()].filter(([k]) => !["limitaciones", "prioridades", "cardioTipos"].includes(k)));
+  const o = Object.fromEntries([...fd.entries()].filter(([k]) => !["limitaciones", "prioridades", "cardioTipos", "peso_kg", "peso_g"].includes(k)));
+  o.peso = readKg(fd, "peso");
   o.limitaciones = fd.getAll("limitaciones");
   o.prioridades = fd.getAll("prioridades");
   o.cardioTipos = fd.getAll("cardioTipos");
@@ -678,9 +687,9 @@ function viewProgress() {
   </section>`}
   ${r && Object.keys(target).length ? `<section class="card"><h3>Series esta semana</h3>${barsVsTarget(weekSetsByMuscle(), target)}</section>` : ""}
   <section class="card"><h3>Peso corporal</h3>
-    <form class="inline-form" id="bwForm"><input name="kg" type="number" inputmode="decimal" step="0.1" min="30" max="300" placeholder="kg" required aria-label="Peso en kg"><input name="fecha" type="date" value="${today()}" aria-label="Fecha"><button class="btn primary small">Añadir</button></form>
-    ${lineChart(bw.map((b) => ({ x: new Date(b.fecha).getTime(), y: +b.kg })), { unit: "kg", label: "Peso corporal" })}
-    ${bw.length ? `<details><summary class="small">Ver registros</summary><ul class="plain">${[...bw].reverse().map((b) => `<li>${fmtDate(b.fecha, { day: "numeric", month: "short", year: "numeric" })}: <b>${fmt(+b.kg)} kg</b> <button class="link" data-act="delBw" data-id="${b.id}">borrar</button></li>`).join("")}</ul></details>` : ""}
+    <form class="inline-form bw-form" id="bwForm">${kgInputs("bw", (bw[bw.length - 1] || {}).kg, true)}<input name="fecha" type="date" value="${today()}" aria-label="Fecha"><button class="btn primary small">Añadir</button></form>
+    ${lineChart(bw.map((b) => ({ x: new Date(b.fecha).getTime(), y: +b.kg })), { unit: "kg", label: "Peso corporal", precise: true })}
+    ${bw.length ? `<details><summary class="small">Ver registros</summary><ul class="plain">${[...bw].reverse().map((b) => `<li>${fmtDate(b.fecha, { day: "numeric", month: "short", year: "numeric" })}: <b>${kgFmt(b.kg)} kg</b> <button class="link" data-act="delBw" data-id="${b.id}">borrar</button></li>`).join("")}</ul></details>` : ""}
   </section>
   ${records.length ? `<section class="card"><h3>Mejores marcas</h3><ul class="plain records">${records.map((x) => `<li><a href="#/ejercicio/${x.id}/0">${esc(byId[x.id]?.nombre)}</a><b>${fmt(x.v)} kg</b></li>`).join("")}</ul></section>` : ""}
   <section><h3>Historial</h3>${ss.map(sessionCard).join("") || `<p class="muted">Sin entrenos todavía.</p>`}</section>`;
@@ -733,7 +742,7 @@ function goalForm() {
     <label>Tipo<select name="tipo" id="goalTipo">
       <option value="ejercicio">Peso en un ejercicio (1RM estimado)</option><option value="sesiones">Número de entrenamientos</option><option value="cardio">Minutos de cardio acumulados</option><option value="peso_corporal">Peso corporal</option><option value="libre">Otro (lo marco yo)</option></select></label>
     <label data-for="ejercicio">Ejercicio<select name="exId">${EXERCISES.filter((e) => !e.tiempo).map((e) => `<option value="${e.id}">${esc(e.nombre)}</option>`).join("")}</select></label>
-    <label data-for="ejercicio sesiones cardio peso_corporal"><span id="goalValLabel">Peso objetivo (kg)</span><input name="valor" type="number" inputmode="decimal" step="0.5" min="1"></label>
+    <label data-for="ejercicio sesiones cardio peso_corporal"><span id="goalValLabel">Peso objetivo (kg)</span><input name="valor" type="number" inputmode="decimal" step="any" min="1"></label>
     <label data-for="libre" hidden>Describe el objetivo<input name="texto" maxlength="120"></label>
     <button class="btn primary block">Guardar objetivo</button></form>`, (m) => {
     const sel = $("#goalTipo", m);
@@ -753,7 +762,7 @@ function viewProfile() {
   <header class="page-h"><h1>Perfil</h1></header>
   ${p ? `<section class="card"><div class="profile-top">${avatarHtml(p, "lg")}<div><h3>${esc(p.nombre)}</h3>
       <div class="row-btns"><label class="btn ghost small">Cambiar foto<input type="file" accept="image/*" id="avatarFile" hidden></label>${p.avatar ? `<button class="btn danger-ghost small" data-act="removeAvatar">Quitar</button>` : ""}<a class="btn ghost small" href="#/formulario">Editar perfil</a></div></div></div>
-    ${drive.getUser()?.email ? `<p class="muted small">${esc(drive.getUser().email)}</p>` : ""}<p class="muted small">${[p.edad && `${p.edad} años`, p.peso && `${fmt(+p.peso)} kg`, p.altura && `${p.altura} cm`].filter(Boolean).join(" · ")}</p>
+    ${drive.getUser()?.email ? `<p class="muted small">${esc(drive.getUser().email)}</p>` : ""}<p class="muted small">${[p.edad && `${p.edad} años`, p.peso && `${kgFmt(p.peso)} kg`, p.altura && `${p.altura} cm`].filter(Boolean).join(" · ")}</p>
     <p>${P.LEVELS[p.experiencia]?.label} · ${P.GOALS[p.objetivo]?.label} · ${P.CARDIO_FOCUS[P.cardioFocus(p)].label} · ${p.dias} días · ${p.duracion} min</p></section>` : `<a class="btn primary block" href="#/formulario">Crear perfil</a>`}
   ${drive.clientId() && !drive.getUser() && drive.getStatus().state !== "off" ? `<section class="card google-cta"><b>Usa tus datos de Google</b><p class="small muted">Vuelve a conectar para que la app pueda leer tu nombre, correo y foto.</p><button class="btn ghost block" data-act="driveConnect">Conectar con Google</button></section>` : ""}
   <section class="card sync-card"><h3>Sincronización con Google Drive</h3>
@@ -1108,8 +1117,9 @@ document.addEventListener("submit", (ev) => {
     closeModal(); render();
   }
   if (f.id === "bwForm") {
-    const d = Object.fromEntries(new FormData(f));
-    store.upsert("bodyweight", { fecha: d.fecha, kg: +d.kg });
+    const fd = new FormData(f), kg = readKg(fd, "bw");
+    if (!kg) { toast("Indica tu peso"); return; }
+    store.upsert("bodyweight", { fecha: fd.get("fecha"), kg });
     checkGoals();
     rerenderKeepScroll();
   }

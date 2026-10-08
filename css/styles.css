@@ -377,3 +377,10 @@ html.rot-l body { transform: translateY(100vh) rotate(-90deg); --safe-t: env(saf
 html.rot-r body { transform: translateX(100vw) rotate(90deg); --safe-t: env(safe-area-inset-right, 0px); --safe-b: 0px; }
 html.rot #view { position: absolute; inset: 0; max-width: none; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding-top: calc(60px + var(--safe-t)); padding-bottom: calc(var(--tab-h) + var(--safe-b) + 24px); }
 html.rot .sheet { max-height: 88vw; }
+
+/* peso en kg + g */
+.kg-g { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 6px; align-items: center; }
+.kg-g small { color: var(--muted); font-weight: 700; }
+.kg-g input { text-align: center; }
+.bw-form { flex-wrap: wrap; }
+.bw-form .kg-g { flex: 1 1 100%; }
