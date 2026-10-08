@@ -1,5 +1,9 @@
 # Notas de versión
 
+## Versión 17 · 8 de octubre de 2026
+
+- **Arreglado:** el menú inferior se subía y dejaba un hueco debajo en el iPhone. Ahora se recoloca al cerrar el teclado o cambiar el alto visible, y su fondo llega hasta el borde de la pantalla.
+
 ## Versión 16 · 8 de octubre de 2026
 
 - **Vacaciones día a día:** antes de empezar solo se ven las fechas. Desde el primer día ves el día de hoy («Hoy · día 3 de 8») y apuntas actividades eligiendo el tipo (caminata, correr, bici, nadar, otro cardio, calistenia, fuerza, deporte, estiramientos u otra cosa) con minutos, km y una nota. Puedes apuntar varias al día; al acabar el día se guarda y pasas al siguiente. Los días sin nada quedan como «Sin actividad». Al terminar, la página muestra el resumen de todos los días.

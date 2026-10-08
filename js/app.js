@@ -1528,6 +1528,12 @@ setInterval(() => {
 }, 1000);
 timer.onTimerChange(() => { const a = store.getActive(); if (a?.rest || a?.cardioRun) { a.rest = null; a.cardioRun = null; store.setActive(a); } });
 
+// iOS: al cerrar el teclado o cambiar el alto visible, la barra inferior fija puede quedarse fuera de sitio
+// hasta que la página se mueve; un desplazamiento nulo la recoloca.
+const fixBottom = () => setTimeout(() => { if (lockedY === null && !rotated()) window.scrollTo(window.scrollX, window.scrollY); }, 60);
+document.addEventListener("focusout", fixBottom);
+window.visualViewport?.addEventListener("resize", fixBottom);
+window.addEventListener("orientationchange", fixBottom);
 window.addEventListener("hashchange", () => { lockedY = lockedY === null ? null : 0; closeModal(); render(); setY(0); });
 timer.setSound(store.get().settings?.sonido !== false);
 timer.configure(store.get().settings?.alarma);

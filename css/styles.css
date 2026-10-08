@@ -450,3 +450,8 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .vac-emoji { font-size: 1.5rem; line-height: 1.2; }
 .vac-day.empty { opacity: .7; }
 .vac-day b:first-child { text-transform: none; }
+
+/* v17: en iOS, al cerrar el teclado o al ocultarse la barra del navegador, el menú inferior puede quedarse
+   desplazado hacia arriba un momento; su fondo se prolonga hacia abajo para que nunca quede un hueco. */
+html { min-height: 100%; background: var(--bg); }
+.tabbar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 50vh; background: var(--surface); }
