@@ -462,3 +462,11 @@ html.rot body { min-height: 0; }
 :root { --tab-pad: calc(var(--safe-b) * 0.55); }
 .tabbar { height: calc(56px + var(--tab-pad)); padding-bottom: var(--tab-pad); align-items: stretch; }
 .tabbar a { justify-content: center; padding-top: 4px; }
+
+/* v20: montar la rutina desde cero */
+.build-row { padding: 12px 14px; }
+.build-row .switch b { font-size: 1rem; }
+.build-row [data-dayopts] { margin-top: 10px; }
+.day-tools { display: flex; align-items: center; gap: 4px; }
+#pickList .eyebrow { margin: 8px 0 0; }
+[data-custom][hidden], [data-dayopts][hidden] { display: none !important; }

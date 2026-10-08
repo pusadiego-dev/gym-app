@@ -1,5 +1,12 @@
 # Notas de versión
 
+## Versión 20 · 8 de octubre de 2026
+
+- **«Ya tengo una rutina»:** al crear la cuenta se puede elegir entre que la app genere la rutina o montarla uno mismo. Se marcan los días de la semana y qué se entrena cada día (pecho y tríceps, espalda y bíceps, pierna, hombro, brazos, torso, empuje, tirón, cuerpo completo, core, cardio o los músculos que se elijan) y después se añaden los ejercicios.
+- **Rutina editable por días:** añadir día, cambiar el nombre y quitar días. Al añadir un ejercicio aparecen primero los de los músculos de ese día.
+- **Hoy por día de la semana:** en rutinas montadas por días de la semana, «Toca hoy» muestra el día en que estás (si no está hecho ya).
+- Desde Rutina también se puede «Montar mi rutina desde cero» más adelante.
+
 ## Versión 19 · 8 de octubre de 2026
 
 - El menú inferior queda más pegado al borde del iPhone: menos espacio vacío bajo los iconos (se usa solo parte de la zona segura de la barra de inicio).

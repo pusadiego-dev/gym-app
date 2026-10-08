@@ -306,7 +306,7 @@ function barsVsTarget(done, target) {
 const routes = {
   hoy: viewHome, rutina: viewRoutine, ejercicios: viewExercises, ejercicio: viewExercise, progreso: viewProgress,
   logros: viewAchievements, perfil: viewProfile, formulario: viewForm, entreno: viewWorkout, cardio: viewCardio,
-  vacaciones: viewVacations,
+  vacaciones: viewVacations, montar: viewBuilder,
 };
 
 function render() {
@@ -338,6 +338,12 @@ function nextDayIdx(routine) {
   const last = sessions().find((s) => s.rutinaId === routine.id);
   return last ? (last.diaIdx + 1) % routine.dias.length : 0;
 }
+// En rutinas por días de la semana (montadas a mano) toca el día de hoy si existe y no está hecho; si no, la rotación.
+function todayDayIdx(r) {
+  const dow = (new Date().getDay() + 6) % 7, i = r.dias.findIndex((d) => d.dow === dow);
+  if (i >= 0 && !sessions().some((s) => s.rutinaId === r.id && s.diaIdx === i && ymd(s.fecha) === ymd())) return i;
+  return nextDayIdx(r);
+}
 function viewHome() {
   const p = store.obj("profile"), r = store.obj("routine"), active = store.getActive();
   const ss = sessions();
@@ -353,7 +359,7 @@ function viewHome() {
   })();
   const vac = vacationNow(), nextVac = !vac && vacations().filter((v) => v.inicio > ymd() && v.inicio <= ymd(new Date(), 14)).pop();
   const dl = deloadState(), dlSug = !dl && deloadSuggestion();
-  const next = r ? nextDayIdx(r) : 0;
+  const next = r ? todayDayIdx(r) : 0;
   const lastAch = store.live("achievements").sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
   return `
   <header class="page-h hello"><div><p class="muted">${fmtDate(new Date(), { weekday: "long", day: "numeric", month: "long" })}</p><h1>Hola, ${esc(p.nombre || "atleta")}</h1></div><a href="#/perfil" aria-label="Perfil">${avatarHtml(p, "md")}</a></header>
@@ -406,6 +412,10 @@ function viewForm() {
   <header class="page-h"><h1>${store.obj("profile") ? "Editar perfil" : "Crea tu perfil"}</h1><p class="muted">Con tus respuestas generamos una rutina semanal basada en la evidencia científica.</p></header>
   ${googleBox}
   <form id="profileForm" class="form">
+    ${isNew ? `<fieldset><legend>Tu rutina</legend>
+      <label class="opt"><input type="radio" name="modoRutina" value="auto" checked><span><b>Créame una rutina</b><small>La app la genera con base científica a partir de tus respuestas.</small></span></label>
+      <label class="opt"><input type="radio" name="modoRutina" value="propia"><span><b>Ya tengo una rutina</b><small>Eliges los días y qué entrenas cada día, y añades tú los ejercicios.</small></span></label>
+    </fieldset>` : ""}
     <fieldset><legend>Sobre ti</legend>
       <div class="avatar-pick"><span id="formAvatarPreview">${avatarHtml(pendingAvatar !== undefined ? { ...p, avatar: pendingAvatar } : p, "lg")}</span>
         <label class="btn ghost small">Elegir foto<input type="file" accept="image/*" id="formAvatar" hidden></label></div>
@@ -430,8 +440,10 @@ function viewForm() {
     <fieldset data-strength ${focus === "solo" ? "hidden" : ""}><legend>Material preferido</legend>${radio("equipo", [["completo", "Peso libre primero", "Barras y mancuernas, con máquinas de apoyo"], ["maquinas", "Máquinas y poleas primero", "Más guiado y fácil de aprender"]], p.equipo)}</fieldset>
     <fieldset><legend>Molestias o lesiones</legend><div class="chips">${check("limitaciones", [["lumbar", "Zona lumbar"], ["rodilla", "Rodillas"], ["hombro", "Hombros"]], p.limitaciones || [])}</div></fieldset>
     <fieldset data-strength ${focus === "solo" ? "hidden" : ""}><legend>Músculos a priorizar <small class="muted">(+4 series/semana)</small></legend><div class="chips">${check("prioridades", Object.entries(MUSCLES), p.prioridades || [])}</div></fieldset>
-    <button class="btn primary block" type="submit">${store.obj("routine") ? "Guardar y regenerar rutina" : "Generar mi rutina"}</button>
-    ${store.obj("profile") ? `<button class="btn ghost block" type="button" data-act="saveProfileOnly">Guardar sin cambiar la rutina</button>` : ""}
+    ${store.obj("routine")?.propia
+      ? `<button class="btn primary block" type="button" data-act="saveProfileOnly">Guardar perfil</button><button class="btn ghost block" type="submit">Cambiar a una rutina generada por la app</button>`
+      : `<button class="btn primary block" type="submit">${store.obj("routine") ? "Guardar y regenerar rutina" : "Continuar"}</button>
+    ${store.obj("profile") ? `<button class="btn ghost block" type="button" data-act="saveProfileOnly">Guardar sin cambiar la rutina</button>` : ""}`}
   </form>`;
 }
 function readForm(form) {
@@ -455,11 +467,12 @@ function viewRoutine() {
   const cmin = P.weeklyCardioMin(r), cequiv = Math.round(P.weeklyCardioEquiv(r));
   return `
   <header class="page-h"><p class="eyebrow">Tu rutina</p><h1>${esc(r.nombre)}</h1><p class="muted">${r.dias.length} días por semana · ${esc(P.GOALS[p.objetivo]?.label || "")}${P.cardioFocus(p) !== "ninguno" ? ` · ${esc(P.CARDIO_FOCUS[P.cardioFocus(p)].label)}` : ""}</p></header>
-  <details class="card why"><summary>¿Por qué esta rutina? (base científica)</summary><ul>${P.rationale(p, r).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
-    <p class="small muted"><a href="#/perfil">Ver referencias</a></p></details>
+  ${r.propia ? `<p class="muted small">Rutina montada por ti. Toca ✎ para cambiar el nombre de un día y «+ Ejercicio» para añadir ejercicios.</p>` : `<details class="card why"><summary>¿Por qué esta rutina? (base científica)</summary><ul>${P.rationale(p, r).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
+    <p class="small muted"><a href="#/perfil">Ver referencias</a></p></details>`}
   ${r.dias.map((d, di) => `
     <section class="card day">
-      <div class="day-h"><h2>${esc(d.nombre)}</h2><span class="muted small">~${Math.round(P.sessionSeconds(d) / 60)} min</span></div>
+      <div class="day-h"><h2>${esc(d.nombre)}</h2><span class="day-tools"><span class="muted small">~${Math.round(P.sessionSeconds(d) / 60)} min</span><button class="icon-btn" data-act="renameDay" data-day="${di}" aria-label="Cambiar nombre">✎</button><button class="icon-btn" data-act="removeDay" data-day="${di}" aria-label="Quitar día">✕</button></span></div>
+      ${!d.ejercicios.length && !dayCardio(d).length ? `<p class="muted small">Día vacío: añade los ejercicios${d.grupos?.length ? ` de ${d.grupos.map((g) => MUSCLES[g]).join(", ").toLowerCase()}` : ""}.</p>` : ""}
       ${d.ejercicios.map((e, ei) => routineRow(e, di, ei)).join("")}
       ${dayCardio(d).map((c, ci) => cardioRow(c, di, ci)).join("")}
       <div class="day-actions"><button class="btn ghost small" data-act="addEx" data-day="${di}">+ Ejercicio</button><button class="btn ghost small" data-act="addCardio" data-day="${di}">+ Cardio</button><button class="btn primary small" data-act="start" data-day="${di}" ${store.getActive() ? "disabled" : ""}>Empezar</button></div>
@@ -470,7 +483,9 @@ function viewRoutine() {
   ${hasStrength ? `<section class="card"><h3>Series semanales por músculo</h3>
     <div class="vol">${Object.keys(MUSCLES).map((m) => `<div><span>${MUSCLES[m]}</span><b class="${(vol[m] || 0) < 8 && !["core", "gemelos", "biceps", "triceps"].includes(m) ? "low" : ""}">${vol[m] || 0}</b></div>`).join("")}</div>
     <p class="muted small">Referencia: unas 10 o más series semanales por músculo grande maximizan la hipertrofia en la mayoría de personas (Schoenfeld et al., 2017). Bíceps, tríceps y hombros reciben además trabajo indirecto de los básicos.</p></section>` : ""}
-  <a class="btn ghost block" href="#/formulario">Cambiar perfil y regenerar</a>`;
+  <button class="btn ghost block" data-act="addDay">+ Añadir día</button>
+  ${r.propia ? "" : `<a class="btn ghost block" href="#/formulario">Cambiar perfil y regenerar</a>`}
+  <a class="btn ghost block" href="#/montar">Montar mi rutina desde cero</a>`;
 }
 function routineRow(e, di, ei) {
   const ex = byId[e.exId];
@@ -715,6 +730,59 @@ function finishWorkout() {
   window.addEventListener("hashchange", celebrate, { once: true });
   location.hash = "#/hoy";
 }
+
+// ---------- montar la rutina desde cero ----------
+const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const ALL_M = Object.keys(MUSCLES);
+const DAY_TYPES = [
+  ["pecho_triceps", "Pecho y tríceps", ["pecho", "triceps"]],
+  ["espalda_biceps", "Espalda y bíceps", ["espalda", "biceps"]],
+  ["pierna", "Pierna", ["cuadriceps", "isquios", "gluteos", "gemelos"]],
+  ["hombro", "Hombro", ["hombros"]],
+  ["brazos", "Brazos", ["biceps", "triceps"]],
+  ["torso", "Torso", ["pecho", "espalda", "hombros", "biceps", "triceps"]],
+  ["empuje", "Empuje (pecho, hombro, tríceps)", ["pecho", "hombros", "triceps"]],
+  ["tiron", "Tirón (espalda, bíceps)", ["espalda", "biceps"]],
+  ["completo", "Cuerpo completo", ALL_M],
+  ["core", "Core / abdomen", ["core"]],
+  ["cardio", "Cardio", []],
+  ["custom", "Elegir músculos…", null],
+];
+// Campos de un día: día de la semana, tipo y (si es «Elegir músculos») los músculos.
+function dayFields(k, dow = "") {
+  return `<div class="build-day" data-k="${k}">
+    ${dow === "" ? `<label>Día de la semana<select name="${k}_dow">${WEEKDAYS.map((w, i) => `<option value="${i}">${w}</option>`).join("")}<option value="">Sin día fijo</option></select></label>` : ""}
+    <label>¿Qué entrenas?<select name="${k}_tipo" data-daytype>${DAY_TYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+    <div class="chips" data-custom hidden>${Object.entries(MUSCLES).map(([v, l]) => `<label class="chip-check"><input type="checkbox" name="${k}_m" value="${v}"><span>${l}</span></label>`).join("")}<label class="chip-check"><input type="checkbox" name="${k}_m" value="cardio"><span>Cardio</span></label></div>
+  </div>`;
+}
+function bindDayFields(root) {
+  root.querySelectorAll("[data-daytype]").forEach((sel) => {
+    const upd = () => (sel.closest(".build-day").querySelector("[data-custom]").hidden = sel.value !== "custom");
+    sel.addEventListener("change", upd); upd();
+  });
+}
+function readDay(fd, k, dow) {
+  const tipo = fd.get(`${k}_tipo`), t = DAY_TYPES.find((x) => x[0] === tipo);
+  const picked = fd.getAll(`${k}_m`);
+  const grupos = t[2] ?? picked.filter((x) => x !== "cardio");
+  const conCardio = tipo === "cardio" || picked.includes("cardio");
+  const label = t[2] ? t[1].replace(/ \(.*\)$/, "") : grupos.map((g) => MUSCLES[g]).concat(conCardio ? ["Cardio"] : []).join(", ") || "Entreno";
+  const cardioId = (store.obj("profile")?.cardioTipos || [])[0] || CARDIO[0].id;
+  return { nombre: dow === "" || dow == null ? label : `${WEEKDAYS[dow]} · ${label}`, dow: dow === "" || dow == null ? undefined : +dow, grupos, ejercicios: [], cardio: conCardio ? [{ cardioId, modo: "z2", min: tipo === "cardio" ? 40 : 20 }] : [] };
+}
+function viewBuilder() {
+  const has = store.obj("routine");
+  return `<header class="page-h"><p class="eyebrow">Tu rutina</p><h1>Monta tu semana</h1><p class="muted">Marca los días que entrenas y qué haces cada día. Después añades los ejercicios en Rutina.${has ? " <b>Sustituirá tu rutina actual</b> (tu historial se conserva)." : ""}</p></header>
+  <form id="buildForm" class="form">
+    ${WEEKDAYS.map((w, i) => `<div class="card build-row"><label class="switch"><input type="checkbox" name="dias" value="${i}" data-buildday> <b>${w}</b></label><div data-dayopts hidden>${dayFields("d" + i, i)}</div></div>`).join("")}
+    <button class="btn primary block">Crear mi semana</button>
+  </form>`;
+}
+document.addEventListener("change", (ev) => {
+  if (ev.target.matches?.("[data-buildday]")) ev.target.closest(".build-row").querySelector("[data-dayopts]").hidden = !ev.target.checked;
+  if (ev.target.matches?.("[data-daytype]")) ev.target.closest(".build-day").querySelector("[data-custom]").hidden = ev.target.value !== "custom";
+});
 
 // ---------- semana de descarga ----------
 function deloadState() {
@@ -1188,7 +1256,7 @@ const actions = {
     const p = store.obj("profile");
     const comp = ex.tipo === "compuesto";
     r.dias[+b.dataset.day].ejercicios.push({ exId: ex.id, variante: P.pickVariant(ex, p) ?? 0, series: 3, repMin: ex.tiempo ? 30 : comp ? 6 : 10, repMax: ex.tiempo ? 60 : comp ? 10 : 15, rir: 2, descanso: comp ? 150 : 90, tiempo: !!ex.tiempo });
-  }, true)),
+  }, true), store.obj("routine").dias[+b.dataset.day]?.grupos),
   technique: (b) => { location.hash = `#/ejercicio/${b.dataset.ex}/${b.dataset.v}`; },
   cardioTechnique: (b) => { location.hash = `#/cardio/${b.dataset.id}`; },
   addCardio: (b) => pickCardio((c) => editRoutine((r) => { const d = r.dias[+b.dataset.day]; (d.cardio ||= []).push({ cardioId: c.id, modo: "z2", min: 20 }); }, true)),
@@ -1265,6 +1333,9 @@ const actions = {
   stopwatch: () => { timer.unlockAudio(); timer.startWork({ label: "Cronómetro" }); },
   restNow: () => { timer.unlockAudio(); const r = timer.startRest(90, "Descanso"); updateActive((a) => (a.rest = r), false); },
   showResults,
+  renameDay: (b) => { const r = store.obj("routine"), d = r.dias[+b.dataset.day]; const n = prompt("Nombre del día", d.nombre); if (n && n.trim()) editRoutine((x) => (x.dias[+b.dataset.day].nombre = n.trim().slice(0, 60))); },
+  removeDay: (b) => { const d = store.obj("routine").dias[+b.dataset.day]; if (store.obj("routine").dias.length <= 1) return toast("La rutina necesita al menos un día"); if (confirmBox(`¿Quitar «${d.nombre}» de la rutina?`)) editRoutine((x) => x.dias.splice(+b.dataset.day, 1)); },
+  addDay: () => modal(`<h2>Añadir día</h2><form id="dayForm" class="form">${dayFields("nd")}<button class="btn primary block">Añadir</button></form>`, bindDayFields),
   deloadStart: () => { saveSettings({ descarga: { inicio: ymd(), fin: ymd(new Date(), 6) } }); toast("Semana de descarga activada: mitad de series y −10 % de peso"); rerenderKeepScroll(); },
   deloadLater: () => { saveSettings({ descargaPospuesta: ymd(new Date(), 7) }); toast("Te lo recuerdo dentro de una semana"); rerenderKeepScroll(); },
   deloadStop: () => { if (confirmBox("¿Terminar ya la semana de descarga?")) { const d = store.get().settings.descarga; saveSettings({ descarga: { ...d, fin: ymd(new Date(), -1) } }); rerenderKeepScroll(); } },
@@ -1371,8 +1442,10 @@ function editRoutine(fn, close) {
   if (close) closeModal();
   rerenderKeepScroll();
 }
-function pickExercise(cb) {
-  modal(`<h2>Elegir ejercicio</h2><input class="search" type="search" placeholder="Buscar…" id="pickQ"><div class="opt-list" id="pickList">${EXERCISES.map((x) => `<button class="opt-btn" data-pick="${x.id}">${animSvg(x.variantes[0].anim, "thumb")}<span><b>${esc(x.nombre)}</b><small>${MUSCLES[x.musculo]}</small></span></button>`).join("")}</div>`, (m) => {
+function pickExercise(cb, grupos = []) {
+  const btn = (x) => `<button class="opt-btn" data-pick="${x.id}">${animSvg(x.variantes[0].anim, "thumb")}<span><b>${esc(x.nombre)}</b><small>${MUSCLES[x.musculo]}</small></span></button>`;
+  const mine = EXERCISES.filter((x) => grupos?.includes(x.musculo)), rest = EXERCISES.filter((x) => !grupos?.includes(x.musculo));
+  modal(`<h2>Elegir ejercicio</h2><input class="search" type="search" placeholder="Buscar…" id="pickQ"><div class="opt-list" id="pickList">${mine.length ? `<p class="eyebrow">De este día</p>${mine.map(btn).join("")}<p class="eyebrow">Otros ejercicios</p>` : ""}${rest.map(btn).join("")}</div>`, (m) => {
     $("#pickQ", m).addEventListener("input", (ev) => {
       const q = ev.target.value.toLowerCase();
       m.querySelectorAll("[data-pick]").forEach((b) => (b.hidden = !b.textContent.toLowerCase().includes(q)));
@@ -1455,16 +1528,34 @@ document.addEventListener("submit", (ev) => {
   const f = ev.target;
   ev.preventDefault();
   if (f.id === "profileForm") {
-    const p = { ...store.obj("profile"), ...readForm(f) };
+    const { modoRutina, ...p } = { ...store.obj("profile"), ...readForm(f) };
     const first = !store.obj("profile");
+    if (!first && store.obj("routine")?.propia && !confirmBox("Se sustituirá tu rutina por una generada por la app. ¿Seguir?")) return;
     store.setObject("profile", p);
-    store.setObject("routine", P.generateRoutine(p));
+    if (modoRutina !== "propia") store.setObject("routine", P.generateRoutine(p));
     if (first && !store.live("goals").length) {
       for (const g of P.suggestedGoals(p)) store.upsert("goals", { ...g, creado: today(), inicio: g.tipo === "peso_corporal" ? +p.peso : undefined });
       if (p.peso) store.upsert("bodyweight", { fecha: today(), kg: +p.peso });
     }
+    if (modoRutina === "propia") { location.hash = "#/montar"; return; }
     toast(first ? "¡Rutina creada!" : "Rutina regenerada");
     location.hash = "#/rutina";
+  }
+  if (f.id === "buildForm") {
+    const fd = new FormData(f), dias = fd.getAll("dias");
+    if (!dias.length) { toast("Marca al menos un día"); return; }
+    const days = dias.map((i) => readDay(fd, "d" + i, i));
+    if (days.some((d, j) => !d.grupos.length && !d.cardio.length && fd.get(`d${dias[j]}_tipo`) === "custom")) { toast("Elige al menos un músculo en los días con «Elegir músculos»"); return; }
+    if (store.obj("routine") && !store.obj("routine").propia && !confirmBox("Se sustituirá tu rutina actual. ¿Seguir?")) return;
+    const p = store.obj("profile") || {};
+    store.setObject("routine", { id: "r" + Date.now().toString(36), nombre: "Mi rutina", propia: true, creada: new Date().toISOString(), dias: days, objetivosSemanales: P.weeklyTargets(p) });
+    if (!store.live("goals").length) for (const g of P.suggestedGoals(p)) store.upsert("goals", { ...g, creado: today(), inicio: g.tipo === "peso_corporal" ? +p.peso : undefined });
+    toast("¡Semana creada! Ahora añade los ejercicios de cada día");
+    location.hash = "#/rutina";
+  }
+  if (f.id === "dayForm") {
+    const fd = new FormData(f), d = readDay(fd, "nd", fd.get("nd_dow"));
+    editRoutine((r) => r.dias.push(d), true);
   }
   if (f.id === "vacForm" || f.id === "vacEditForm") {
     const d = Object.fromEntries(new FormData(f));

@@ -32,6 +32,16 @@ export const KG_TIERS = [
 // Notas de versión (la primera es la actual).
 export const CHANGELOG = [
   {
+    version: "20",
+    fecha: "2026-10-08",
+    cambios: [
+      "Al crear la cuenta puedes elegir «Ya tengo una rutina»: marcas los días de la semana que entrenas y qué haces cada día (pecho y tríceps, pierna, torso, cardio… o los músculos que quieras) y luego añades tus ejercicios.",
+      "En Rutina puedes añadir días, cambiarles el nombre y quitarlos, y al añadir un ejercicio salen primero los de los músculos de ese día.",
+      "Si tu rutina va por días de la semana, en Hoy te toca el del día en que estás.",
+      "También puedes montar tu rutina desde cero más adelante, desde Rutina.",
+    ],
+  },
+  {
     version: "19",
     fecha: "2026-10-08",
     cambios: ["El menú inferior queda más pegado al borde del iPhone: menos espacio vacío bajo los iconos."],
