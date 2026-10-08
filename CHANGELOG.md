@@ -1,5 +1,9 @@
 # Notas de versión
 
+## Versión 18 · 8 de octubre de 2026
+
+- **Arreglado (segundo intento):** el menú inferior seguía dejando un hueco en el iPhone. Ahora la app mide el borde real de la zona visible (visualViewport) y baja el menú lo que haga falta, y la página ocupa siempre al menos la pantalla entera aunque tenga poco contenido.
+
 ## Versión 17 · 8 de octubre de 2026
 
 - **Arreglado:** el menú inferior se subía y dejaba un hueco debajo en el iPhone. Ahora se recoloca al cerrar el teclado o cambiar el alto visible, y su fondo llega hasta el borde de la pantalla.

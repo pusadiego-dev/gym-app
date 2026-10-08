@@ -1530,10 +1530,23 @@ timer.onTimerChange(() => { const a = store.getActive(); if (a?.rest || a?.cardi
 
 // iOS: al cerrar el teclado o cambiar el alto visible, la barra inferior fija puede quedarse fuera de sitio
 // hasta que la página se mueve; un desplazamiento nulo la recoloca.
-const fixBottom = () => setTimeout(() => { if (lockedY === null && !rotated()) window.scrollTo(window.scrollX, window.scrollY); }, 60);
+// Además se mide el borde real de la pantalla (visualViewport): si la zona visible acaba más abajo que la
+// ventana en la que iOS coloca los elementos fijos, la barra se baja esa diferencia (nunca se sube sobre el teclado).
+const vv = window.visualViewport;
+function placeBottom() {
+  const g = vv && !rotated() ? Math.round(vv.offsetTop + vv.height - window.innerHeight) : 0;
+  document.documentElement.style.setProperty("--vv-fix", `${g > 1 ? g : 0}px`);
+}
+const fixBottom = () => setTimeout(() => { if (lockedY === null && !rotated()) window.scrollTo(window.scrollX, window.scrollY); placeBottom(); }, 60);
 document.addEventListener("focusout", fixBottom);
-window.visualViewport?.addEventListener("resize", fixBottom);
+vv?.addEventListener("resize", () => { placeBottom(); fixBottom(); });
+vv?.addEventListener("scroll", placeBottom);
+window.addEventListener("scroll", placeBottom, { passive: true });
+window.addEventListener("resize", placeBottom);
 window.addEventListener("orientationchange", fixBottom);
+window.addEventListener("pageshow", fixBottom);
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && fixBottom());
+placeBottom();
 window.addEventListener("hashchange", () => { lockedY = lockedY === null ? null : 0; closeModal(); render(); setY(0); });
 timer.setSound(store.get().settings?.sonido !== false);
 timer.configure(store.get().settings?.alarma);
