@@ -327,6 +327,11 @@ export const REFERENCES = [
 ];
 
 // Progresión doble: sugerencia para hoy a partir de la última vez.
+// Cuánto subir de peso cuando se completa el rango (más en piernas y compuestos).
+export function increment(ex, w) {
+  const lower = ["cuadriceps", "isquios", "gluteos"].includes(ex?.musculo) && ex?.tipo === "compuesto";
+  return Math.max(lower ? 5 : ex?.tipo === "compuesto" ? 2.5 : 1, Math.round(w * 0.025 * 2) / 2);
+}
 export function suggestion(slot, lastSets) {
   const ex = byId[slot.exId];
   if (!lastSets || !lastSets.length) return null;
@@ -340,8 +345,7 @@ export function suggestion(slot, lastSets) {
   const top = done.filter((s) => (+s.peso || 0) === w);
   const allTop = top.length >= slot.series && top.every((s) => s.reps >= slot.repMax);
   if (allTop && w > 0) {
-    const lower = ["cuadriceps", "isquios", "gluteos"].includes(ex.musculo) && ex.tipo === "compuesto";
-    const inc = Math.max(lower ? 5 : ex.tipo === "compuesto" ? 2.5 : 1, Math.round(w * 0.025 * 2) / 2);
+    const inc = increment(ex, w);
     return { texto: `¡Sube peso! Prueba ${fmt(w + inc)} kg × ${slot.repMin}+`, peso: w + inc, sube: true };
   }
   const minReps = Math.min(...top.map((s) => s.reps));

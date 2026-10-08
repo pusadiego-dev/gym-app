@@ -7,6 +7,7 @@ import * as timer from "./timer.js";
 import * as theme from "./theme.js";
 import { ADMIN_EMAILS } from "./config.js";
 import { CARDIO, cardioById, CARDIO_MODES, isInterval, intervalMinutes, intervalPhases, hrRange } from "./cardio.js";
+import { QUOTES, KG_TIERS, CHANGELOG } from "./extras.js";
 
 const { fmt, e1rm } = P;
 const $ = (s, r = document) => r.querySelector(s);
@@ -19,8 +20,12 @@ const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 
 const variant = (exId, v) => byId[exId]?.variantes[v] || byId[exId]?.variantes[0];
 const exName = (exId, v) => variant(exId, v)?.nombre || byId[exId]?.nombre || exId;
 const sessions = () => store.live("sessions").sort((a, b) => b.fecha.localeCompare(a.fecha));
-const APP_VERSION = "13";
+const APP_VERSION = CHANGELOG[0].version;
 // Peso corporal en kilos y gramos (dos campos enteros: en iPhone el teclado decimal pone coma y falla).
+const setsDone = (e) => e.sets.filter((x) => x.hecho !== false);
+const volOf = (s) => s.ejercicios.reduce((n, e) => n + setsDone(e).reduce((m, x) => m + (+x.peso || 0) * (+x.reps || 0), 0), 0);
+const liftedTotal = () => store.live("sessions").reduce((n, s) => n + volOf(s), 0);
+const kgInt = (n) => Math.round(n).toLocaleString("es-ES");
 const kgFmt = (n) => (Math.round(+n * 1000) / 1000).toString().replace(".", ",");
 function kgInputs(name, value, required = false) {
   const v = +value || 0, kg = v ? Math.floor(v + 1e-9) : "", g = v ? Math.round((v - Math.floor(v + 1e-9)) * 1000) : "";
@@ -100,10 +105,12 @@ function unlockScroll() {
   setY(y);
 }
 const pageY = () => (lockedY ?? getY());
-function modal(html, onMount) {
+// sticky: no se cierra al tocar fuera (pantallas de fin de entreno)
+function modal(html, onMount, { sticky = false } = {}) {
   const m = $("#modal");
   lockScroll();
-  m.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><button class="close" data-act="closeModal" aria-label="Cerrar">✕</button>${html}</div>`;
+  m.dataset.sticky = sticky ? "1" : "";
+  m.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${sticky ? "" : `<button class="close" data-act="closeModal" aria-label="Cerrar">✕</button>`}${html}</div>`;
   m.classList.add("open");
   onMount?.(m);
 }
@@ -529,20 +536,33 @@ function viewCardio(id) {
 function startWorkout(di) {
   const r = store.obj("routine");
   const d = r.dias[di];
+  const planKey = `${r.id}:${di}`, plan = store.get().settings?.plan?.[planKey];
   const act = {
     id: store.uid(), inicio: Date.now(), diaIdx: di, diaNombre: d.nombre, rutinaId: r.id, rest: null,
     ejercicios: d.ejercicios.map((slot) => {
       const last = lastSetsFor(slot.exId, slot.variante);
       const sug = P.suggestion(slot, last?.mismaVariante ? last.sets : null);
       const lastW = last?.mismaVariante ? Math.max(0, ...last.sets.filter((s) => s.hecho).map((s) => +s.peso || 0)) : 0;
-      const peso = sug?.peso ?? (lastW || "");
-      return { exId: slot.exId, variante: slot.variante, slot: { ...slot }, sets: Array.from({ length: slot.series }, () => ({ peso: peso === 0 ? "" : peso, reps: "", seg: "", hecho: false })) };
+      const pp = plan?.pesos?.[`${slot.exId}:${slot.variante}`];
+      const peso = pp ?? sug?.peso ?? (lastW || "");
+      return { exId: slot.exId, variante: slot.variante, slot: { ...slot }, plan: pp != null ? { modo: plan.modo, peso: pp } : undefined, sets: Array.from({ length: slot.series }, () => ({ peso: peso === 0 ? "" : peso, reps: "", seg: "", hecho: false })) };
     }),
     cardio: dayCardio(d).map(newCardioEntry),
   };
   store.setActive(act);
+  if (plan) { const st = store.get().settings || {}, rest = { ...st.plan }; delete rest[planKey]; store.setObject("settings", { ...st, plan: rest }); }
   timer.unlockAudio();
   location.hash = "#/entreno";
+}
+// Siguiente ejercicio que falta (después del actual y dando la vuelta); el cardio siempre al final.
+function nextPending(a, from) {
+  const ex = a.ejercicios, n = ex.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (from + k) % n;
+    if (ex[i].sets.some((s) => !s.hecho)) return { id: `wex-${i}`, nombre: exName(ex[i].exId, ex[i].variante) };
+  }
+  const ci = (a.cardio || []).findIndex((c) => !c.hecho);
+  return ci >= 0 ? { id: `wcardio-${ci}`, nombre: cardioName(a.cardio[ci]) } : null;
 }
 const newCardioEntry = (c) => ({ cardioId: c.cardioId, modo: c.modo, min: c.min, real: { min: "", km: "", rpe: "", fc: "" }, hecho: false });
 function viewWorkout() {
@@ -574,7 +594,7 @@ function workoutExercise(e, ei) {
       <button class="icon-btn" data-act="wexMenu" data-i="${ei}" aria-label="Opciones">⋯</button>
     </div>
     ${last ? `<p class="last small">Última vez (${fmtDate(last.fecha)}): ${last.sets.filter((x) => x.hecho).map((x) => (s.tiempo ? `${x.seg} s` : `${fmt(+x.peso || 0)}×${x.reps}`)).join(", ") || "—"}${last.mismaVariante ? "" : " <span class='muted'>(otra variante)</span>"}</p>` : `<p class="last small muted">Primera vez: elige un peso con el que llegues al rango dejando ${s.rir} reps en reserva.</p>`}
-    ${sug ? `<p class="sug ${sug.sube ? "up" : ""} small">${esc(sug.texto)}</p>` : ""}
+    ${e.plan ? `<p class="sug ${e.plan.modo === "mejoras" ? "up" : ""} small">Preparado al terminar la última sesión (${e.plan.modo === "mejoras" ? "con mejoras" : "mismos pesos"}): ${fmt(+e.plan.peso)} kg</p>` : sug ? `<p class="sug ${sug.sube ? "up" : ""} small">${esc(sug.texto)}</p>` : ""}
     <div class="sets">
       <div class="set head"><span>#</span><span>kg</span><span>${s.tiempo ? "seg" : "reps"}</span><span></span></div>
       ${e.sets.map((st, si) => `<div class="set ${st.hecho ? "done" : ""}">
@@ -639,23 +659,164 @@ function finishWorkout() {
     const now = Math.max(...e.sets.map((s) => e1rm(s.peso, s.reps)));
     if (now > before && before > 0) prs.push({ exId: e.exId, before, now });
   }
-  store.upsert("sessions", { id: a.id, fecha, duracionSeg: Math.round((Date.now() - a.inicio) / 1000), diaIdx: a.diaIdx, diaNombre: a.diaNombre, rutinaId: a.rutinaId, ejercicios, cardio });
+  const sess = store.upsert("sessions", { id: a.id, fecha, duracionSeg: Math.round((Date.now() - a.inicio) / 1000), diaIdx: a.diaIdx, diaNombre: a.diaNombre, rutinaId: a.rutinaId, ejercicios, cardio });
   store.setActive(null);
   timer.stop(false);
   timer.releaseScreen();
   const goals = checkGoals();
-  // el resumen se abre después de cambiar de vista (al cambiar de vista se cierran los modales)
-  window.addEventListener("hashchange", () => summary(), { once: true });
+  const achs = awardKgAchievements();
+  lastResult = buildResults(a, sess, { prs, goals, achs });
+  // la enhorabuena se abre después de cambiar de vista (al cambiar de vista se cierran los modales)
+  window.addEventListener("hashchange", celebrate, { once: true });
   location.hash = "#/hoy";
-  const summary = () => {
-  const sets = ejercicios.reduce((n, e) => n + e.sets.length, 0), cmin = cardio.reduce((n, c) => n + c.min, 0);
-  modal(`<h2>¡Entreno completado! 💪</h2>
-    <p>${[sets && `${sets} ${sets === 1 ? "serie" : "series"}`, cmin && `${cmin} min de cardio`].filter(Boolean).join(" y ")} en ${Math.round((Date.now() - a.inicio) / 60000)} min.</p>
-    ${prs.length ? `<h3>Nuevos récords</h3><ul class="prs">${prs.map((p) => `<li>🏅 ${esc(byId[p.exId].nombre)}: ${fmt(p.now)} kg 1RM est. <span class="muted">(antes ${fmt(p.before)})</span></li>`).join("")}</ul>` : ""}
-    ${goals.length ? `<h3>Objetivos conseguidos</h3><ul>${goals.map((g) => `<li>🎯 ${esc(goalTitle(g))}</li>`).join("")}</ul><a class="btn primary block" href="#/logros" data-act="closeModal">Añadir a mis logros</a>` : ""}
-    <button class="btn ${goals.length ? "ghost" : "primary"} block" data-act="closeModal">Cerrar</button>`);
-  };
 }
+
+// ---------- fin del entreno: enhorabuena y resultados ----------
+let lastResult = null;
+const MET_CARDIO = { z2: 5, moderado: 7, largo: 6, int_suave: 7, x4x4: 8.5, x10x1: 8.5 };
+const MET_FUERZA = 5; // entrenamiento con pesas, esfuerzo vigoroso (Compendium of Physical Activities)
+const roundW = (x, ex) => { const st = ex?.tipo === "compuesto" ? 2.5 : 1; return Math.max(st, Math.round(x / st) * st); };
+
+function awardKgAchievements() {
+  const tot = liftedTotal(), all = store.get().achievements, out = [];
+  for (const t of KG_TIERS) {
+    const id = `kg-${t.kg}`; // id fijo: si lo borras no vuelve a aparecer
+    if (tot >= t.kg && !all.some((x) => x.id === id)) out.push(store.upsert("achievements", { id, emoji: t.emoji, titulo: t.titulo, descripcion: t.desc, fecha: today(), auto: "kg" }));
+  }
+  return out;
+}
+
+function buildResults(a, s, extra) {
+  const V = volOf(s);
+  const before = sessions().filter((x) => x.id !== s.id && x.fecha < s.fecha);
+  const ids = new Set(s.ejercicios.map((e) => e.exId));
+  let prev = before.find((x) => x.rutinaId === s.rutinaId && x.diaIdx === s.diaIdx && x.ejercicios.length);
+  if (!prev && ids.size) {
+    let best = 0;
+    for (const x of before) { const ov = x.ejercicios.filter((e) => ids.has(e.exId)).length; if (ov > best) { best = ov; prev = x; } }
+  }
+  const week = store.live("sessions").filter((x) => new Date(x.fecha).getTime() >= weekStart()).reduce((n, x) => n + volOf(x), 0);
+
+  // calorías estimadas: MET × peso corporal × horas
+  const bw = store.live("bodyweight").sort((x, y) => y.fecha.localeCompare(x.fecha))[0]?.kg || +store.obj("profile")?.peso || 75;
+  const cMin = s.cardio.reduce((n, c) => n + c.min, 0);
+  const strMin = s.ejercicios.length ? Math.max(5, s.duracionSeg / 60 - cMin) : 0;
+  const nSets = s.ejercicios.reduce((n, e) => n + e.sets.length, 0);
+  const kStr = (MET_FUERZA * bw * strMin) / 60;
+  const kcalEx = s.ejercicios.map((e) => ({ e, kcal: nSets ? (kStr * e.sets.length) / nSets : 0 }));
+  const kcalCardio = s.cardio.map((c) => ({ c, kcal: ((MET_CARDIO[c.modo] || 6) * bw * c.min) / 60 }));
+  const kcal = kcalEx.reduce((n, x) => n + x.kcal, 0) + kcalCardio.reduce((n, x) => n + x.kcal, 0);
+
+  // revisión de lo planificado y propuestas por ejercicio
+  const review = [], tips = [], plan = {}, same = {};
+  for (const e of a.ejercicios) {
+    const nm = exName(e.exId, e.variante), sl = e.slot, ex = byId[e.exId];
+    const done = e.sets.filter((x) => x.hecho), tot = e.sets.length;
+    if (!done.length) { review.push(`No hiciste ${nm} (0 de ${tot} series).`); continue; }
+    if (done.length < tot) review.push(`${nm}: te faltaron ${tot - done.length} de ${tot} series.`);
+    const key = `${e.exId}:${e.variante}`;
+    const w = Math.max(0, ...done.map((x) => +x.peso || 0));
+    if (sl.tiempo) {
+      const secs = done.map((x) => +x.seg || 0), best = Math.max(...secs);
+      const short = secs.filter((x) => x && x < sl.repMin).length;
+      if (short) review.push(`${nm}: ${short} ${short === 1 ? "serie" : "series"} por debajo de ${sl.repMin} s.`);
+      tips.push(best >= sl.repMax ? { nm, tipo: "up", txt: `Llegaste a ${best} s (objetivo ${sl.repMin}-${sl.repMax} s). Próxima vez: añade peso o una variante más difícil.` }
+        : best < sl.repMin ? { nm, tipo: "down", txt: `Te quedaste en ${best || 0} s (objetivo ${sl.repMin}-${sl.repMax} s). Descansa un poco más e intenta llegar a ${sl.repMin} s.` }
+        : { nm, tipo: "ok", txt: `Dentro del rango (${best} s). Intenta sumar 5 s por serie.` });
+      if (w) plan[key] = same[key] = w;
+      continue;
+    }
+    const reps = done.map((x) => +x.reps || 0);
+    const over = reps.filter((r) => r > sl.repMax).length, under = reps.filter((r) => r < sl.repMin).length;
+    const allTop = reps.every((r) => r >= sl.repMax), rng = `${sl.repMin}-${sl.repMax}`;
+    if (under) review.push(`${nm}: ${under} ${under === 1 ? "serie" : "series"} por debajo de ${sl.repMin} reps (${reps.join(", ")}).`);
+    let nuevo = w, tipo = "ok", txt;
+    if (!w) {
+      tipo = allTop ? "up" : under ? "down" : "ok";
+      txt = allTop ? `Llegaste al tope (${sl.repMax} reps) en todas las series: prueba una variante más difícil o añade lastre.` : under ? `No llegaste a ${sl.repMin} reps en alguna serie: intenta sumar 1 rep por serie.` : `Dentro del rango: intenta 1 rep más por serie.`;
+    } else if (allTop || over * 2 > reps.length) {
+      nuevo = w + P.increment(ex, w); tipo = "up";
+      txt = `${over ? `Superaste el rango (hasta ${Math.max(...reps)} reps, objetivo ${rng}).` : `Llegaste al tope del rango (${sl.repMax} reps) en todas las series.`} Sube a ${fmt(nuevo)} kg.`;
+    } else if (under === reps.length) {
+      nuevo = roundW(w * 0.9, ex); tipo = "down";
+      txt = `No llegaste al rango (máximo ${Math.max(...reps)} reps, objetivo ${rng}). Baja a ${fmt(nuevo)} kg para hacer las repeticiones con buena técnica.`;
+    } else if (under) {
+      tipo = "down"; txt = `Algunas series se quedaron por debajo de ${sl.repMin} reps. Mantén ${fmt(w)} kg y descansa un poco más entre series.`;
+    } else if (over) {
+      txt = `Alguna serie pasó de ${sl.repMax} reps. Mantén ${fmt(w)} kg y sube cuando hagas ${sl.repMax} en todas.`;
+    } else txt = `Dentro del rango (${reps.join(", ")} reps). Mantén ${fmt(w)} kg e intenta 1 rep más por serie.`;
+    if (w) { plan[key] = nuevo; same[key] = w; }
+    tips.push({ nm, tipo, txt });
+  }
+  for (const c of a.cardio || []) {
+    if (!c.hecho) review.push(`No hiciste el cardio: ${cardioName(c)} (${c.min} min).`);
+    else if (+c.real.min && +c.real.min < c.min) review.push(`${cardioName(c)}: ${c.real.min} de ${c.min} min.`);
+  }
+  return { s, V, prev, prevV: prev ? volOf(prev) : 0, week, total: liftedTotal(), kcal, kcalEx, kcalCardio, review, tips, plan, same, planKey: `${s.rutinaId}:${s.diaIdx}`, ...extra };
+}
+
+function celebrate() {
+  const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  const name = store.obj("profile")?.nombre?.split(" ")[0];
+  modal(`<div class="celebrate">
+    <div class="hero" id="hero"><span>${q.emoji}</span></div>
+    <p class="eyebrow">Entreno completado</p>
+    <h2>¡Enhorabuena${name ? `, ${esc(name)}` : ""}! 🎉</h2>
+    <blockquote>“${esc(q.frase)}”</blockquote>
+    <p class="who"><b>${esc(q.nombre)}</b> <span class="muted">· ${esc(q.tipo)}</span></p>
+    <p class="muted small" id="heroCredit" hidden>Foto: Wikimedia Commons</p>
+    <button class="btn primary block" data-act="showResults">Ver resultados</button></div>`, (m) => loadHero(q, m), { sticky: true });
+}
+// La foto se pide a Wikipedia al momento (no se guarda) y solo se muestra si es de uso libre (Wikimedia Commons).
+function loadHero(q, m) {
+  if (!navigator.onLine) return;
+  fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q.wiki)}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      const src = d?.thumbnail?.source;
+      if (!src || !src.includes("/wikipedia/commons/")) return;
+      const img = new Image();
+      img.alt = q.nombre;
+      img.referrerPolicy = "no-referrer";
+      img.onload = () => { const h = m.querySelector("#hero"); if (!h) return; h.replaceChildren(img); h.classList.add("photo"); m.querySelector("#heroCredit").hidden = false; };
+      img.src = src;
+    })
+    .catch(() => {});
+}
+
+function showResults() {
+  const r = lastResult;
+  if (!r) return closeModal();
+  const s = r.s, sets = s.ejercicios.reduce((n, e) => n + e.sets.length, 0), cmin = s.cardio.reduce((n, c) => n + c.min, 0);
+  const pct = r.prevV ? Math.round(((r.V - r.prevV) / r.prevV) * 100) : null;
+  const strength = s.ejercicios.length > 0;
+  const setTxt = (x) => (x.seg && !x.reps ? `${x.seg} s` : `${fmt(x.peso)}×${x.reps}`);
+  modal(`<h2>Resultados</h2>
+    <p class="muted">${esc(s.diaNombre)} · ${Math.round(s.duracionSeg / 60)} min · ${[sets && `${sets} ${sets === 1 ? "serie" : "series"}`, cmin && `${cmin} min de cardio`].filter(Boolean).join(" y ")}</p>
+    ${strength ? `<section class="res"><h3>🏋️ Kilos levantados</h3>
+      <div class="stats"><div class="stat"><span class="n">${kgInt(r.V)}<small>kg</small></span><span>hoy</span></div><div class="stat"><span class="n">${kgInt(r.week)}<small>kg</small></span><span>esta semana</span></div><div class="stat"><span class="n">${kgInt(r.total)}<small>kg</small></span><span>en total</span></div></div>
+      ${r.prev ? `<p class="small ${pct >= 0 ? "up" : "down"}">${pct >= 0 ? "▲" : "▼"} ${pct > 0 ? "+" : ""}${pct} % respecto a «${esc(r.prev.diaNombre)}» del ${fmtDate(r.prev.fecha)} (${kgInt(r.prevV)} kg)</p>` : `<p class="small muted">Primera vez con estos ejercicios: la próxima podrás compararlo.</p>`}
+    </section>` : ""}
+    <section class="res"><h3>🔥 Calorías: ≈ ${Math.round(r.kcal)} kcal</h3>
+      <ul class="plain res-list">${r.kcalEx.map(({ e, kcal }) => `<li><span><b>${esc(exName(e.exId, e.variante))}</b><small>${e.sets.map(setTxt).join(" · ")}</small></span><span>${Math.round(kcal)} kcal</span></li>`).join("")}
+      ${r.kcalCardio.map(({ c, kcal }) => `<li><span><b>${esc(cardioName(c))}</b><small>${[CARDIO_MODES[c.modo]?.corto, `${c.min} min`, c.km && `${fmt(c.km)} km`].filter(Boolean).join(" · ")}</small></span><span>${Math.round(kcal)} kcal</span></li>`).join("")}</ul>
+      <p class="muted small">Estimación con tu peso corporal y el tiempo de entreno (equivalentes metabólicos, MET). Orientativo.</p>
+    </section>
+    <section class="res"><h3>✅ Revisión</h3>
+      ${r.review.length ? `<ul class="res-review">${r.review.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="small up">Has completado todos los ejercicios, series y repeticiones. ¡Perfecto!</p>`}
+    </section>
+    ${r.tips.length ? `<section class="res"><h3>📈 Rango de repeticiones</h3>
+      <ul class="plain res-tips">${r.tips.map((t) => `<li class="${t.tipo}"><b>${esc(t.nm)}</b><span>${esc(t.txt)}</span></li>`).join("")}</ul></section>` : ""}
+    ${r.prs.length ? `<section class="res"><h3>🏅 Nuevos récords</h3><ul class="prs">${r.prs.map((p) => `<li>${esc(byId[p.exId].nombre)}: ${fmt(p.now)} kg 1RM est. <span class="muted">(antes ${fmt(p.before)})</span></li>`).join("")}</ul></section>` : ""}
+    ${r.achs.length ? `<section class="res"><h3>🏆 Nuevo logro</h3><ul class="plain">${r.achs.map((x) => `<li class="ach-mini"><span class="emoji">${x.emoji}</span><div><b>${esc(x.titulo)}</b><p class="small muted">${esc(x.descripcion)}</p></div></li>`).join("")}</ul></section>` : ""}
+    ${r.goals.length ? `<section class="res"><h3>🎯 Objetivos conseguidos</h3><ul>${r.goals.map((g) => `<li>${esc(goalTitle(g))}</li>`).join("")}</ul><a class="btn ghost block small" href="#/logros">Añadir a mis logros</a></section>` : ""}
+    ${Object.keys(r.plan).length ? `<h3>Siguiente sesión de «${esc(s.diaNombre)}»</h3>
+      <button class="btn primary block" data-act="planNext" data-mode="mejoras">Siguiente sesión con mejoras</button>
+      <button class="btn ghost block" data-act="planNext" data-mode="igual">Siguiente sesión igual</button>
+      <button class="link block small" data-act="closeModal">Cerrar sin preparar nada</button>`
+    : `<button class="btn primary block" data-act="closeModal">Cerrar</button>`}`, null, { sticky: true });
+}
+
 function discardWorkout() { store.setActive(null); timer.stop(false); timer.releaseScreen(); location.hash = "#/hoy"; }
 
 // PROGRESO
@@ -726,8 +887,16 @@ function viewAchievements() {
         ${done ? `<button class="btn primary small" data-act="goalToAch" data-id="${g.id}">🏆 Añadir como logro</button>` : g.tipo === "libre" ? `<button class="btn ghost small" data-act="goalDone" data-id="${g.id}">Marcar conseguido</button>` : ""}
       </div>`; }).join("") || `<p class="muted">Sin objetivos. Añade el primero.</p>`}
   </section>
+  ${kgCard()}
   <section><div class="sec-h"><h3>Mis logros</h3><button class="btn primary small" data-act="newAch">+ Logro</button></div>
     <div class="ach-grid">${achs.map((a) => `<div class="ach"><span class="emoji">${a.emoji}</span><b>${esc(a.titulo)}</b>${a.descripcion ? `<p class="small">${esc(a.descripcion)}</p>` : ""}<span class="muted small">${fmtDate(a.fecha, { day: "numeric", month: "short", year: "numeric" })}</span><button class="link small" data-act="delAch" data-id="${a.id}">borrar</button></div>`).join("") || `<p class="muted">Aún no hay logros. ¡El primero está cerca!</p>`}</div>
+  </section>`;
+}
+function kgCard() {
+  const tot = liftedTotal(), next = KG_TIERS.find((t) => tot < t.kg), prevKg = [...KG_TIERS].reverse().find((t) => tot >= t.kg)?.kg || 0;
+  return `<section class="card"><h3>Kilos levantados</h3>
+    <p><b>${kgInt(tot)} kg</b> en total${next ? ` · siguiente logro: ${next.emoji} ${esc(next.titulo)}` : " · ¡todos los logros de kilos conseguidos!"}</p>
+    ${next ? `<div class="progress"><span style="width:${((tot - prevKg) / (next.kg - prevKg)) * 100}%"></span></div><p class="muted small">Te faltan ${kgInt(next.kg - tot)} kg. Cuenta el peso × repeticiones de todas tus series.</p>` : ""}
   </section>`;
 }
 function achForm(pre = {}) {
@@ -782,13 +951,31 @@ function viewProfile() {
     <button class="btn danger-ghost small" data-act="wipe">Borrar datos…</button>
   </section>
   ${appearanceHtml()}
-  <section class="card"><h3>Ajustes</h3>
-    <label class="switch"><input type="checkbox" data-act-change="sound" ${store.get().settings?.sonido !== false ? "checked" : ""}> Sonido al terminar el descanso</label>
-  </section>
+  ${settingsHtml()}
+  ${newsHtml()}
   <section class="card"><h3>Referencias científicas</h3><ol class="refs small">${P.REFERENCES.map((r) => `<li>${esc(r)}</li>`).join("")}</ol>
   <p class="muted small">Versión ${APP_VERSION}. Esta app no sustituye el consejo médico. Si tienes dolor o una lesión, consulta a un profesional.</p></section>`;
 }
 
+function settingsHtml() {
+  const al = timer.config();
+  return `<section class="card settings"><h3>Ajustes</h3>
+    <label class="switch"><input type="checkbox" data-act-change="sound" ${store.get().settings?.sonido !== false ? "checked" : ""}> Sonido al terminar el descanso</label>
+    <label>Sonido de la alarma<select id="alarmTipo" data-act-change="alarm">${timer.ALARMS.map((x) => `<option value="${x.id}" ${x.id === al.tipo ? "selected" : ""}>${x.nombre}</option>`).join("")}</select></label>
+    <label>Volumen de la alarma: <output id="alarmVolOut">${al.vol} %</output><input id="alarmVol" type="range" min="5" max="100" step="5" value="${al.vol}" data-act-change="alarm"></label>
+    <button class="btn ghost small" data-act="alarmTest">🔔 Probar sonido</button>
+    <label class="switch"><input type="checkbox" id="alarmFondo" data-act-change="alarm" ${al.fondo ? "checked" : ""}> Avisar también con la app en segundo plano</label>
+    <p class="muted small">Al empezar un descanso se reproduce una pista de audio con la alarma al final, así suena aunque cambies de app o bloquees el móvil, y lo verás en la pantalla de bloqueo. Mientras dura puede pausar la música de otras apps. La app no puede abrirse sola: toca el aviso para volver. El volumen también depende del volumen del móvil.</p>
+  </section>`;
+}
+function newsHtml() {
+  const [cur, ...old] = CHANGELOG;
+  return `<section class="card news"><h3>Novedades · versión ${esc(cur.version)}</h3>
+    <p class="muted small">${fmtDate(cur.fecha, { day: "numeric", month: "long", year: "numeric" })}</p>
+    <ul>${cur.cambios.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+    ${old.length ? `<details><summary class="small">Versiones anteriores</summary>${old.map((v) => `<p><b>Versión ${esc(v.version)}</b></p><ul>${v.cambios.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>`).join("")}</details>` : ""}
+  </section>`;
+}
 function appearanceHtml() {
   const t = theme.resolve(store.get().settings?.tema);
   const custom = t.preset === "custom";
@@ -904,7 +1091,7 @@ const actions = {
   toggleSet: (b) => {
     timer.unlockAudio();
     const ei = +b.dataset.e, si = +b.dataset.s;
-    let startRest = false, rest = 0, label = "";
+    let startRest = false, rest = 0, label = "", goTo = null;
     updateActive((a) => {
       const e = a.ejercicios[ei], st = e.sets[si];
       st.hecho = !st.hecho;
@@ -914,9 +1101,12 @@ const actions = {
         e.sets.slice(si + 1).forEach((x) => { if (!x.hecho && x.peso === "") x.peso = st.peso; });
         startRest = true; rest = e.slot.descanso;
         const nextLeft = e.sets.some((x) => !x.hecho);
-        label = nextLeft ? `Siguiente: serie ${e.sets.findIndex((x) => !x.hecho) + 1} de ${exName(e.exId, e.variante)}` : (a.ejercicios[ei + 1] ? `Siguiente: ${exName(a.ejercicios[ei + 1].exId, a.ejercicios[ei + 1].variante)}` : "Último ejercicio completado");
+        const np = nextLeft ? null : nextPending(a, ei);
+        label = nextLeft ? `Siguiente: serie ${e.sets.findIndex((x) => !x.hecho) + 1} de ${exName(e.exId, e.variante)}` : np ? `Siguiente: ${np.nombre}` : "¡Todo hecho! Ya puedes terminar el entreno";
+        goTo = np?.id;
       }
     });
+    if (goTo) setTimeout(() => document.getElementById(goTo)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     if (startRest) {
       const r = timer.startRest(rest, label);
       updateActive((a) => (a.rest = r), false);
@@ -931,6 +1121,16 @@ const actions = {
   },
   stopwatch: () => { timer.unlockAudio(); timer.startWork({ label: "Cronómetro" }); },
   restNow: () => { timer.unlockAudio(); const r = timer.startRest(90, "Descanso"); updateActive((a) => (a.rest = r), false); },
+  showResults,
+  alarmTest: () => timer.preview($("#alarmTipo")?.value, +$("#alarmVol")?.value),
+  planNext: (b) => {
+    const r = lastResult;
+    if (!r) return closeModal();
+    const modo = b.dataset.mode, st = store.get().settings || {};
+    store.setObject("settings", { ...st, plan: { ...st.plan, [r.planKey]: { modo, fecha: today(), pesos: modo === "mejoras" ? r.plan : r.same } } });
+    closeModal();
+    toast(`Listo: la próxima vez que hagas «${r.s.diaNombre}» empezará con ${modo === "mejoras" ? "las mejoras" : "los mismos pesos"}`);
+  },
   finish: () => { if (confirmBox("¿Terminar y guardar el entreno?")) finishWorkout(); },
   discard: () => { if (confirmBox("¿Descartar este entreno? Se perderán las series.")) discardWorkout(); },
   filterM: (b) => { exFilter.m = b.dataset.v; render(); },
@@ -1031,7 +1231,7 @@ function pickExercise(cb) {
 }
 
 document.addEventListener("click", (ev) => {
-  if (ev.target.id === "modal") return closeModal();
+  if (ev.target.id === "modal") return ev.target.dataset.sticky ? undefined : closeModal();
   const b = ev.target.closest("[data-act]");
   if (!b || b.disabled) return;
   const fn = actions[b.dataset.act];
@@ -1047,6 +1247,7 @@ document.addEventListener("input", (ev) => {
     render();
     const n = $(".search"); n.focus(); n.setSelectionRange(pos, pos);
   }
+  if (t.id === "alarmVol") $("#alarmVolOut").textContent = `${t.value} %`;
   if (t.dataset.set) {
     updateActive((a) => (a.ejercicios[+t.dataset.e].sets[+t.dataset.s][t.dataset.set] = t.value), false);
   }
@@ -1072,6 +1273,12 @@ document.addEventListener("change", (ev) => {
     document.querySelectorAll("[data-strength]").forEach((f) => (f.hidden = t.value === "solo"));
   }
   if (t.dataset.actChange === "progEx") { progEx = t.value; rerenderKeepScroll(); }
+  if (t.dataset.actChange === "alarm") {
+    const alarma = { tipo: $("#alarmTipo").value, vol: +$("#alarmVol").value, fondo: $("#alarmFondo").checked };
+    store.setObject("settings", { ...store.get().settings, alarma });
+    timer.configure(alarma);
+    if (t.id === "alarmTipo") timer.preview(alarma.tipo, alarma.vol);
+  }
   if (t.dataset.actChange === "sound") { store.setObject("settings", { ...store.get().settings, sonido: t.checked }); timer.setSound(t.checked); }
   if (t.dataset.themeColor) {
     const tema = { ...store.get().settings?.tema, preset: "custom", [t.dataset.themeColor]: t.value };
@@ -1138,7 +1345,7 @@ $("#sync").addEventListener("click", async () => {
 });
 drive.onStatus(() => { renderSyncChip(); if (document.body.dataset.route === "perfil" || (document.body.dataset.route === "formulario" && !store.obj("profile") && drive.getUser() && !$("input[name=nombre]")?.value)) render(); });
 store.subscribe((_, source) => {
-  if (source === "sync" || source === "wipe") theme.apply(store.get().settings?.tema);
+  if (source === "sync" || source === "wipe") { theme.apply(store.get().settings?.tema); timer.setSound(store.get().settings?.sonido !== false); timer.configure(store.get().settings?.alarma); }
   if (source === "sync" && document.body.dataset.route !== "entreno") rerenderKeepScroll();
 });
 
@@ -1151,6 +1358,7 @@ timer.onTimerChange(() => { const a = store.getActive(); if (a?.rest || a?.cardi
 
 window.addEventListener("hashchange", () => { lockedY = lockedY === null ? null : 0; closeModal(); render(); setY(0); });
 timer.setSound(store.get().settings?.sonido !== false);
+timer.configure(store.get().settings?.alarma);
 theme.apply(store.get().settings?.tema);
 
 // restaura el descanso si se recargó la página
@@ -1160,6 +1368,13 @@ else if (act?.cardioRun && act.cardio?.[act.cardioRun.ci]) { const run = act.car
 
 render();
 if (drive.getStatus().state === "ok") drive.sync().catch(() => {});
+
+// novedades: se muestran una vez al llegar una versión nueva
+try {
+  const seen = localStorage.getItem("gymapp:version");
+  if (store.obj("profile") && seen !== APP_VERSION && !act) modal(newsHtml().replace('<section class="card news">', '<section class="news">') + `<button class="btn primary block" data-act="closeModal">¡Vamos!</button>`);
+  if (store.obj("profile")) localStorage.setItem("gymapp:version", APP_VERSION);
+} catch {}
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("./sw.js").then((reg) => {
