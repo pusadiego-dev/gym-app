@@ -32,6 +32,11 @@ export const KG_TIERS = [
 // Notas de versión (la primera es la actual).
 export const CHANGELOG = [
   {
+    version: "22",
+    fecha: "2026-10-09",
+    cambios: ["Los campos de peso (kilos y gramos) son más anchos y se leen mejor, en el perfil y en Progreso → Peso corporal. En el perfil, el peso va ahora en su propia fila."],
+  },
+  {
     version: "21",
     fecha: "2026-10-08",
     cambios: ["En Perfil → Mi rutina: «Borrar mi rutina y empezar de cero». Pide confirmación, conserva tus entrenos, progreso y logros, y te deja montar una nueva tú mismo o que la cree la app."],

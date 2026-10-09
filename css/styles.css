@@ -471,3 +471,8 @@ html.rot body { min-height: 0; }
 #pickList .eyebrow { margin: 8px 0 0; }
 [data-custom][hidden], [data-dayopts][hidden] { display: none !important; }
 a.opt-btn { text-decoration: none; }
+
+/* v22: campos de kg y g más anchos */
+.kg-g { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: 8px; }
+.kg-g input { width: 100%; min-width: 0; font-size: 1.1rem; padding-left: 4px; padding-right: 4px; }
+.bw-form .kg-g + input[type=date] { flex: 1 1 auto; }

@@ -1,5 +1,9 @@
 # Notas de versión
 
+## v22 · 2026-10-09
+
+- Los campos de peso (kilos y gramos) son más anchos y se leen mejor, en el perfil y en Progreso → Peso corporal. En el perfil, el peso va ahora en su propia fila.
+
 ## Versión 21 · 8 de octubre de 2026
 
 - **Borrar mi rutina y empezar de cero** (Perfil → Mi rutina): pide confirmación, borra solo la rutina (entrenos, progreso, logros y vacaciones se conservan) y luego eliges entre montarla tú («Ya tengo una rutina») o que la app la genere a partir de tu perfil. Si no hay entreno en curso.

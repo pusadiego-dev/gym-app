@@ -420,11 +420,11 @@ function viewForm() {
       <div class="avatar-pick"><span id="formAvatarPreview">${avatarHtml(pendingAvatar !== undefined ? { ...p, avatar: pendingAvatar } : p, "lg")}</span>
         <label class="btn ghost small">Elegir foto<input type="file" accept="image/*" id="formAvatar" hidden></label></div>
       <label>Nombre<input name="nombre" required value="${esc(p.nombre)}" autocomplete="given-name"></label>
-      <div class="row3">
+      <div class="two">
         <label>Edad<input name="edad" type="number" inputmode="numeric" min="12" max="100" value="${esc(p.edad)}"></label>
-        <label>Peso${kgInputs("peso", p.peso)}</label>
         <label>Altura (cm)<input name="altura" type="number" inputmode="numeric" min="120" max="230" value="${esc(p.altura)}"></label>
       </div>
+      <label>Peso${kgInputs("peso", p.peso)}</label>
       <label>Sexo<select name="sexo"><option value="">Prefiero no decirlo</option><option value="h" ${p.sexo === "h" ? "selected" : ""}>Hombre</option><option value="m" ${p.sexo === "m" ? "selected" : ""}>Mujer</option></select></label>
     </fieldset>
     <fieldset><legend>Experiencia</legend>${radio("experiencia", Object.entries(P.LEVELS).map(([k, v]) => [k, v.label, v.desc]), p.experiencia)}</fieldset>
