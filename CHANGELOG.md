@@ -1,6 +1,6 @@
 # Notas de versión
 
-## v22 · 2026-10-09
+## Versión 22 · 9 de octubre de 2026
 
 - Los campos de peso (kilos y gramos) son más anchos y se leen mejor, en el perfil y en Progreso → Peso corporal. En el perfil, el peso va ahora en su propia fila.
 
