@@ -32,6 +32,11 @@ export const KG_TIERS = [
 // Notas de versión (la primera es la actual).
 export const CHANGELOG = [
   {
+    version: "23",
+    fecha: "2026-10-09",
+    cambios: ["Nuevo cardio: «Andar rápido en cinta» sin inclinación (5,5-7 km/h), con su animación y técnica. Lo puedes elegir en tu perfil, en tu rutina y en Ejercicios."],
+  },
+  {
     version: "22",
     fecha: "2026-10-09",
     cambios: ["Los campos de peso (kilos y gramos) son más anchos y se leen mejor, en el perfil y en Progreso → Peso corporal. En el perfil, el peso va ahora en su propia fila."],

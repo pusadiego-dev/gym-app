@@ -37,6 +37,7 @@ const ropeFrames = [0, 90, 180, 270, 360].map((r, k) => {
 const ANIM = {
   run: { loop: true, period: 900, frames: gait({ hip: [94, 100], t: 12, front: [120, 177], back: [58, 158], under: [97, 178], swing: [72, 142], arm: 40, bob: 4 }), props: treadmill() },
   walkIncline: { loop: true, period: 1500, frames: gait({ hip: [92, 101], t: 8, front: [114, 175], back: [72, 179], under: [94, 178], swing: [88, 168], arm: 22, bob: 2 }), props: treadmill(12) },
+  walkFast: { loop: true, period: 1100, frames: gait({ hip: [93, 100], t: 6, front: [118, 177], back: [66, 177], under: [95, 178], swing: [84, 166], arm: 30, bob: 2 }), props: treadmill() },
   bike: {
     loop: true, period: 1100, frames: bikeFrames,
     props: [{ k: "line", x1: 66, y1: 184, x2: 152, y2: 184, w: 5 }, { k: "line", x1: 84, y1: 114, x2: 104, y2: 168, w: 5 }, { k: "rect", x: 66, y: 108, w: 28, h: 5 }, { k: "line", x1: 132, y1: 182, x2: 138, y2: 104, w: 5 }, { k: "line", x1: 128, y1: 103, x2: 146, y2: 100, w: 4 }, { k: "circle", x: 138, y: 160, r: 16, cls: "wheel" }, { k: "lever", from: [C.x, C.y], at: "ankle2" }, { k: "lever", from: [C.x, C.y], at: "ankle", front: true }],
@@ -70,6 +71,10 @@ export const CARDIO = [
     pasos: ["Sube la inclinación antes que la velocidad (5-6 km/h suele bastar).", "Tronco erguido, mirada al frente.", "Brazos sueltos acompañando el paso."],
     errores: ["Colgarse de las barras: reduce mucho el esfuerzo real.", "Inclinarse hacia atrás para compensar la pendiente."],
     consejo: "Muy útil para acumular minutos en zona 2 con poco impacto. Si no puedes ir sin agarrarte, baja la inclinación." },
+  { id: "cinta_rapido", nombre: "Andar rápido en cinta", sub: "Sin inclinación, 5,5-7 km/h", impacto: "bajo", avoid: [], distancia: true, anim: ANIM.walkFast,
+    pasos: ["Inclinación a 0 % (o 1 % si quieres imitar el exterior) y velocidad de paso vivo: 5,5-7 km/h.", "Pasos cortos y rápidos: apoya el talón y rueda hasta la punta.", "Tronco erguido y mirada al frente.", "Brazos doblados a unos 90° moviéndose al ritmo de las piernas."],
+    errores: ["Agarrarse a las barras o al panel.", "Alargar demasiado la zancada para ir más rápido.", "Mirar al suelo o a la pantalla encorvado."],
+    consejo: "Cardio de bajo impacto para zona 2 o para calentar. Si te cuesta hablar, baja un poco la velocidad; si va muy fácil, sube la velocidad o pasa a la cinta inclinada." },
   { id: "bici", nombre: "Bici estática", sub: "Bici o spinning", impacto: "bajo", avoid: [], distancia: true, anim: ANIM.bike,
     pasos: ["Altura del sillín: con el pedal abajo, la rodilla queda casi estirada (unos 25-35° de flexión).", "Rodillas alineadas con los pies, sin abrirlas.", "Cadencia de 80-100 pedaladas por minuto y regula el esfuerzo con la resistencia."],
     errores: ["Sillín demasiado bajo: carga las rodillas.", "Balancear la cadera sobre el sillín (está demasiado alto)."],

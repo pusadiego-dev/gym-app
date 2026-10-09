@@ -1,5 +1,9 @@
 # Notas de versión
 
+## Versión 23 · 9 de octubre de 2026
+
+- Nuevo cardio: «Andar rápido en cinta» sin inclinación (5,5-7 km/h), con su animación y técnica. Lo puedes elegir en tu perfil, en tu rutina y en Ejercicios.
+
 ## Versión 22 · 9 de octubre de 2026
 
 - Los campos de peso (kilos y gramos) son más anchos y se leen mejor, en el perfil y en Progreso → Peso corporal. En el perfil, el peso va ahora en su propia fila.
