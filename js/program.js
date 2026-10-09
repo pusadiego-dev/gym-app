@@ -101,7 +101,7 @@ export function pickVariant(ex, p) {
   if (!ok.length) return null;
   const prefMachines = p.equipo === "maquinas" || p.experiencia === "principiante";
   const order = prefMachines ? ["maquina", "polea", "libre"] : ["libre", "polea", "maquina"];
-  ok.sort((a, b) => order.indexOf(a.v.tipo) - order.indexOf(b.v.tipo) || a.i - b.i);
+  ok.sort((a, b) => !!a.v.uni - !!b.v.uni || order.indexOf(a.v.tipo) - order.indexOf(b.v.tipo) || a.i - b.i);
   return ok[0].i;
 }
 

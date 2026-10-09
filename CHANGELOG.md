@@ -1,5 +1,12 @@
 # Notas de versión
 
+## Versión 24 · 9 de octubre de 2026
+
+- 31 variantes unilaterales nuevas (a una mano, a un brazo o a una pierna) en press de banca e inclinado, cruce de polea, jalón, remo, press de hombro, elevaciones laterales, deltoides posterior, curls, tríceps, prensa, extensión de cuádriceps, peso muerto rumano, curl femoral, hip thrust y gemelos.
+- Las que ya eran de un lado (remo con mancuerna, zancadas, búlgara, patadas de glúteo…) también aparecen como unilaterales.
+- En Ejercicios hay un filtro «Unilateral», y al elegir variante en tu rutina o en el entreno se ve cuáles lo son. Cada una trae un consejo de cómo hacerla y apuntarla.
+- Las rutinas que crea la app siguen usando por defecto las variantes con los dos lados.
+
 ## Versión 23 · 9 de octubre de 2026
 
 - Nuevo cardio: «Andar rápido en cinta» sin inclinación (5,5-7 km/h), con su animación y técnica. Lo puedes elegir en tu perfil, en tu rutina y en Ejercicios.

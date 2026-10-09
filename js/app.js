@@ -1,4 +1,4 @@
-import { EXERCISES, MUSCLES, VARIANT_LABEL, byId } from "./exercises.js";
+import { EXERCISES, MUSCLES, VARIANT_LABEL, vLabel, byId } from "./exercises.js";
 import { mountAnim, frameSvg } from "./anim.js";
 import * as P from "./program.js";
 import * as store from "./store.js";
@@ -320,6 +320,8 @@ function render() {
   view.innerHTML = fn(...args.map(decodeURIComponent));
   mountAnims(view);
   bindCharts(view);
+  const tab = view.querySelector(".tabs .tab.on"); // variante elegida visible aunque esté al final de la lista
+  if (tab) tab.parentElement.scrollLeft = tab.offsetLeft - 16;
   renderSyncChip();
   $("#avatarTop").innerHTML = profile ? avatarHtml(profile, "sm") : "";
 }
@@ -493,7 +495,7 @@ function routineRow(e, di, ei) {
     <svg class="thumb" data-anim="${e.exId}:${e.variante}" viewBox="0 0 200 200"></svg>
     <div class="ex-main">
       <a href="#/ejercicio/${e.exId}/${e.variante}" class="ex-name">${esc(exName(e.exId, e.variante))}</a>
-      <span class="muted small">${MUSCLES[ex.musculo]} · ${VARIANT_LABEL[variant(e.exId, e.variante).tipo]}</span>
+      <span class="muted small">${MUSCLES[ex.musculo]} · ${vLabel(variant(e.exId, e.variante))}</span>
       <div class="ex-params">
         <label><input type="number" inputmode="numeric" min="1" max="10" value="${e.series}" data-edit="series" data-day="${di}" data-i="${ei}" aria-label="Series"> series</label>
         <label><input type="number" inputmode="numeric" min="1" max="100" value="${e.repMin}" data-edit="repMin" data-day="${di}" data-i="${ei}" aria-label="Mínimo">–<input type="number" inputmode="numeric" min="1" max="120" value="${e.repMax}" data-edit="repMax" data-day="${di}" data-i="${ei}" aria-label="Máximo"> ${e.tiempo ? "s" : "reps"}</label>
@@ -540,15 +542,16 @@ let exFilter = { m: "", t: "", q: "" };
 function viewExercises() {
   const cardioOnly = exFilter.m === "cardio";
   const clist = exFilter.t || (exFilter.m && !cardioOnly) ? [] : CARDIO.filter((c) => !exFilter.q || (c.nombre + " " + c.sub + " cardio").toLowerCase().includes(exFilter.q.toLowerCase()));
-  const list = cardioOnly ? [] : EXERCISES.filter((e) => (!exFilter.m || e.musculo === exFilter.m) && (!exFilter.t || e.variantes.some((v) => v.tipo === exFilter.t)) && (!exFilter.q || (e.nombre + e.variantes.map((v) => v.nombre).join(" ")).toLowerCase().includes(exFilter.q.toLowerCase())));
+  const tOk = (v) => (exFilter.t === "uni" ? v.uni : v.tipo === exFilter.t);
+  const list = cardioOnly ? [] : EXERCISES.filter((e) => (!exFilter.m || e.musculo === exFilter.m) && (!exFilter.t || e.variantes.some(tOk)) && (!exFilter.q || (e.nombre + e.variantes.map((v) => v.nombre).join(" ")).toLowerCase().includes(exFilter.q.toLowerCase())));
   return `
   <header class="page-h"><h1>Ejercicios</h1><p class="muted">${EXERCISES.length} ejercicios con ${EXERCISES.reduce((n, e) => n + e.variantes.length, 0)} variantes y ${CARDIO.length} actividades de cardio, con su técnica animada.</p></header>
   <input class="search" type="search" placeholder="Buscar ejercicio…" value="${esc(exFilter.q)}" data-filter="q">
   <div class="chips scroll">${[["", "Todos"], ["cardio", "Cardio"], ...Object.entries(MUSCLES)].map(([k, l]) => `<button class="chip ${exFilter.m === k ? "on" : ""}" data-act="filterM" data-v="${k}">${l}</button>`).join("")}</div>
-  <div class="chips">${[["", "Todo el material"], ...Object.entries(VARIANT_LABEL)].map(([k, l]) => `<button class="chip ${exFilter.t === k ? "on" : ""}" data-act="filterT" data-v="${k}">${l}</button>`).join("")}</div>
+  <div class="chips">${[["", "Todo el material"], ...Object.entries(VARIANT_LABEL), ["uni", "Unilateral"]].map(([k, l]) => `<button class="chip ${exFilter.t === k ? "on" : ""}" data-act="filterT" data-v="${k}">${l}</button>`).join("")}</div>
   <div class="ex-grid">${list.map((e) => {
-    const vi = exFilter.t ? Math.max(0, e.variantes.findIndex((v) => v.tipo === exFilter.t)) : 0;
-    return `<a class="ex-card" href="#/ejercicio/${e.id}/${vi}">${animSvg(e.variantes[vi].anim, "thumb")}<b>${esc(e.nombre)}</b><span class="muted small">${MUSCLES[e.musculo]} · ${[...new Set(e.variantes.map((v) => VARIANT_LABEL[v.tipo]))].join(", ")}</span></a>`;
+    const vi = exFilter.t ? Math.max(0, e.variantes.findIndex(tOk)) : 0;
+    return `<a class="ex-card" href="#/ejercicio/${e.id}/${vi}">${animSvg(e.variantes[vi].anim, "thumb")}<b>${esc(e.nombre)}</b><span class="muted small">${MUSCLES[e.musculo]} · ${[...new Set(e.variantes.map((v) => VARIANT_LABEL[v.tipo]))].join(", ")}${e.variantes.some((v) => v.uni) ? " · unilateral" : ""}</span></a>`;
   }).join("")}${clist.map((c) => `<a class="ex-card" href="#/cardio/${c.id}">${cardioThumb(c)}<b>${esc(c.nombre)}</b><span class="muted small">Cardio · ${esc(c.sub)}</span></a>`).join("")}${list.length || clist.length ? "" : `<p class="muted">Sin resultados.</p>`}</div>`;
 }
 function viewExercise(id, v = "0") {
@@ -560,8 +563,9 @@ function viewExercise(id, v = "0") {
   return `
   <a class="back" href="#/ejercicios">← Ejercicios</a>
   <header class="page-h"><p class="eyebrow">${MUSCLES[ex.musculo]}${ex.secundarios.length ? ` · también ${ex.secundarios.map((m) => MUSCLES[m].toLowerCase()).join(", ")}` : ""}</p><h1>${esc(ex.nombre)}</h1></header>
-  <div class="tabs">${ex.variantes.map((x, i) => `<a class="tab ${i === vi ? "on" : ""}" href="#/ejercicio/${id}/${i}">${VARIANT_LABEL[x.tipo]}<small>${esc(x.nombre)}</small></a>`).join("")}</div>
+  <div class="tabs">${ex.variantes.map((x, i) => `<a class="tab ${i === vi ? "on" : ""}" href="#/ejercicio/${id}/${i}">${vLabel(x)}<small>${esc(x.nombre)}</small></a>`).join("")}</div>
   <div class="anim-stage"><svg class="anim big" data-anim="${id}:${vi}" role="img" aria-label="Animación: ${esc(ex.variantes[vi].nombre)}"></svg><p class="small muted center">${esc(ex.variantes[vi].nombre)}</p></div>
+  ${ex.variantes[vi].uni ? `<section class="card tip-card"><h3>Unilateral</h3><p>Haz todas las repeticiones con un lado y luego con el otro, empezando por el más débil, y descansa lo justo al cambiar. Apunta el peso y las repeticiones de un solo lado.</p></section>` : ""}
   <section class="card"><h3>Cómo se hace</h3><ol class="steps">${ex.pasos.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></section>
   <section class="card warn"><h3>Errores comunes</h3><ul>${ex.errores.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></section>
   <section class="card tip-card"><h3>Consejo</h3><p>${esc(ex.consejo)}</p></section>
@@ -1239,7 +1243,7 @@ const actions = {
     const di = +b.dataset.day, ei = +b.dataset.i, r = store.obj("routine"), e = r.dias[di].ejercicios[ei], ex = byId[e.exId];
     const alts = EXERCISES.filter((x) => x.musculo === ex.musculo && x.id !== ex.id);
     modal(`<h2>${esc(ex.nombre)}</h2>
-      <h3>Variante</h3><div class="opt-list">${ex.variantes.map((v, i) => `<button class="opt-btn ${i === e.variante ? "on" : ""}" data-act="setVariant" data-day="${di}" data-i="${ei}" data-v="${i}">${animSvg(v.anim, "thumb")}<span><b>${esc(v.nombre)}</b><small>${VARIANT_LABEL[v.tipo]}</small></span></button>`).join("")}</div>
+      <h3>Variante</h3><div class="opt-list">${ex.variantes.map((v, i) => `<button class="opt-btn ${i === e.variante ? "on" : ""}" data-act="setVariant" data-day="${di}" data-i="${ei}" data-v="${i}">${animSvg(v.anim, "thumb")}<span><b>${esc(v.nombre)}</b><small>${vLabel(v)}</small></span></button>`).join("")}</div>
       ${alts.length ? `<h3>Cambiar por otro ejercicio</h3><div class="opt-list">${alts.map((x) => `<button class="opt-btn" data-act="swapEx" data-day="${di}" data-i="${ei}" data-ex="${x.id}"><span><b>${esc(x.nombre)}</b><small>${MUSCLES[x.musculo]}</small></span></button>`).join("")}</div>` : ""}
       <div class="row-btns"><button class="btn ghost small" data-act="moveEx" data-day="${di}" data-i="${ei}" data-d="-1">↑ Subir</button><button class="btn ghost small" data-act="moveEx" data-day="${di}" data-i="${ei}" data-d="1">↓ Bajar</button><button class="btn danger-ghost small" data-act="removeEx" data-day="${di}" data-i="${ei}">Quitar</button></div>`);
   },
@@ -1293,7 +1297,7 @@ const actions = {
   }),
   wexMenu: (b) => {
     const a = store.getActive(), ei = +b.dataset.i, e = a.ejercicios[ei], ex = byId[e.exId];
-    modal(`<h2>${esc(ex.nombre)}</h2><h3>Variante para hoy</h3><div class="opt-list">${ex.variantes.map((v, i) => `<button class="opt-btn ${i === e.variante ? "on" : ""}" data-act="wexVariant" data-i="${ei}" data-v="${i}">${animSvg(v.anim, "thumb")}<span><b>${esc(v.nombre)}</b><small>${VARIANT_LABEL[v.tipo]}</small></span></button>`).join("")}</div>
+    modal(`<h2>${esc(ex.nombre)}</h2><h3>Variante para hoy</h3><div class="opt-list">${ex.variantes.map((v, i) => `<button class="opt-btn ${i === e.variante ? "on" : ""}" data-act="wexVariant" data-i="${ei}" data-v="${i}">${animSvg(v.anim, "thumb")}<span><b>${esc(v.nombre)}</b><small>${vLabel(v)}</small></span></button>`).join("")}</div>
       <div class="row-btns"><a class="btn ghost small" href="#/ejercicio/${e.exId}/${e.variante}" data-act="closeModal">Ver técnica</a><button class="btn danger-ghost small" data-act="wexRemove" data-i="${ei}">Quitar de hoy</button></div>`);
   },
   wexVariant: (b) => { updateActive((a) => (a.ejercicios[+b.dataset.i].variante = +b.dataset.v)); closeModal(); },
