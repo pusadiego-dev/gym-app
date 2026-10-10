@@ -1,5 +1,10 @@
 # Notas de versión
 
+## Versión 25 · 10 de octubre de 2026
+
+- Diario de vacaciones: al apuntar una actividad puedes añadir fotos (hasta 6), haciéndolas con la cámara en el momento o eligiéndolas de la galería. Se ven en miniatura en cada día y en grande al tocarlas.
+- Las fotos se guardan reducidas en el móvil y, si tienes conectada tu cuenta de Google, en la carpeta privada de la app en tu Drive, así que también las ves en tus otros dispositivos. Al borrar una actividad se borran sus fotos.
+
 ## Versión 24 · 9 de octubre de 2026
 
 - 31 variantes unilaterales nuevas (a una mano, a un brazo o a una pierna) en press de banca e inclinado, cruce de polea, jalón, remo, press de hombro, elevaciones laterales, deltoides posterior, curls, tríceps, prensa, extensión de cuádriceps, peso muerto rumano, curl femoral, hip thrust y gemelos.

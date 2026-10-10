@@ -169,6 +169,33 @@ async function upload(data) {
   fileId = (await r.json()).id;
 }
 
+// Archivos sueltos en appDataFolder (fotos del diario): listar, subir, bajar y borrar.
+export async function listFiles(prefix) {
+  const out = [];
+  let page = "";
+  do {
+    const q = encodeURIComponent(`name contains '${prefix}'`);
+    const r = await api(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&pageSize=1000&fields=nextPageToken,files(id,name,modifiedTime)${page ? `&pageToken=${page}` : ""}`);
+    const j = await r.json();
+    out.push(...(j.files || []).filter((f) => f.name.startsWith(prefix)));
+    page = j.nextPageToken || "";
+  } while (page);
+  return out;
+}
+export async function uploadBlob(name, blob) {
+  const boundary = "gymapp" + Math.random().toString(36).slice(2);
+  const meta = { name, parents: ["appDataFolder"], mimeType: blob.type || "image/jpeg" };
+  const body = new Blob([`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${meta.mimeType}\r\n\r\n`, blob, `\r\n--${boundary}--`]);
+  const r = await api("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body });
+  return (await r.json()).id;
+}
+export const downloadBlob = async (id) => (await api(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`)).blob();
+export const deleteFile = (id) => api(`https://www.googleapis.com/drive/v3/files/${id}`, { method: "DELETE" });
+
+// Se avisa tras cada sincronización correcta (con los datos ya fusionados).
+const syncedHooks = new Set();
+export const onSynced = (fn) => syncedHooks.add(fn);
+
 let syncing = null;
 let gen = 0; // cambia al desconectar: descarta sincronizaciones que estaban en curso
 // Descarga, fusiona con lo local y sube el resultado.
@@ -187,6 +214,7 @@ export async function sync() {
       if (JSON.stringify(merged) !== JSON.stringify(store.get())) store.replaceAll(merged, "sync");
       await upload(merged);
       setStatus("ok", "Sincronizado");
+      if (myGen === gen) syncedHooks.forEach((fn) => Promise.resolve().then(() => fn(merged)).catch(() => {}));
     } catch (e) {
       if (e.message !== "expired") setStatus("error", "Error al sincronizar: " + e.message);
       throw e;

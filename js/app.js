@@ -5,6 +5,7 @@ import * as store from "./store.js";
 import * as drive from "./drive.js";
 import * as timer from "./timer.js";
 import * as theme from "./theme.js";
+import * as photos from "./photos.js";
 import { ADMIN_EMAILS } from "./config.js";
 import { CARDIO, cardioById, CARDIO_MODES, isInterval, intervalMinutes, intervalPhases, hrRange } from "./cardio.js";
 import { QUOTES, KG_TIERS, CHANGELOG } from "./extras.js";
@@ -133,6 +134,7 @@ function modal(html, onMount, { sticky = false } = {}) {
   m.dataset.sticky = sticky ? "1" : "";
   m.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${sticky ? "" : `<button class="close" data-act="closeModal" aria-label="Cerrar">✕</button>`}${html}</div>`;
   m.classList.add("open");
+  photos.hydrate(m);
   onMount?.(m);
 }
 function closeModal() { $("#modal").classList.remove("open"); $("#modal").innerHTML = ""; unlockScroll(); }
@@ -320,6 +322,7 @@ function render() {
   view.innerHTML = fn(...args.map(decodeURIComponent));
   mountAnims(view);
   bindCharts(view);
+  photos.hydrate(view);
   const tab = view.querySelector(".tabs .tab.on"); // variante elegida visible aunque esté al final de la lista
   if (tab) tab.parentElement.scrollLeft = tab.offsetLeft - 16;
   renderSyncChip();
@@ -836,7 +839,21 @@ const vacNotes = (v, d) => (v.notas || []).filter((n) => n.fecha === d).sort((a,
 function vacEntry(n, v, editable) {
   const t = vacType(n.tipo);
   const meta = [n.min && `${n.min} min`, n.km && `${fmt(+n.km)} km`].filter(Boolean).join(" · ");
-  return `<li class="vac-entry"><span class="vac-emoji">${t.emoji}</span><div><b>${esc(t.nombre)}</b>${meta ? ` <span class="muted small">${meta}</span>` : ""}${n.texto ? `<p>${esc(n.texto).replace(/\n/g, "<br>")}</p>` : ""}</div>${editable ? `<button class="icon-btn" data-act="delVacNote" data-id="${v.id}" data-n="${n.id}" aria-label="Borrar">✕</button>` : ""}</li>`;
+  return `<li class="vac-entry"><span class="vac-emoji">${t.emoji}</span><div><b>${esc(t.nombre)}</b>${meta ? ` <span class="muted small">${meta}</span>` : ""}${n.texto ? `<p>${esc(n.texto).replace(/\n/g, "<br>")}</p>` : ""}${(n.fotos || []).length ? `<div class="vac-photos">${n.fotos.map((id) => vacPhoto(id, `data-act="vacPhotoView"`)).join("")}</div>` : ""}</div>${editable ? `<button class="icon-btn" data-act="delVacNote" data-id="${v.id}" data-n="${n.id}" aria-label="Borrar">✕</button>` : ""}</li>`;
+}
+const vacPhoto = (id, attrs = "") => `<button type="button" class="vac-photo" data-photo-id="${id}" ${attrs} aria-label="Ver foto"><img data-photo="${id}" alt=""></button>`;
+let vacPending = []; // fotos añadidas en el formulario de actividad aún sin guardar
+const VAC_MAX_FOTOS = 6;
+function vacPendingHtml() {
+  return vacPending.map((id) => `<span class="vac-photo-wrap">${vacPhoto(id)}<button type="button" class="icon-btn vac-photo-del" data-act="vacPhotoDel" data-photo-id="${id}" aria-label="Quitar foto">✕</button></span>`).join("");
+}
+function refreshVacPending() {
+  const box = $("#vacPhotos");
+  if (!box) return;
+  box.innerHTML = vacPendingHtml();
+  photos.hydrate(box);
+  const full = vacPending.length >= VAC_MAX_FOTOS;
+  document.querySelectorAll(".vac-photo-pick").forEach((l) => l.classList.toggle("disabled", full));
 }
 function vacHomeCard(v) {
   const t = ymd(), hoy = vacNotes(v, t);
@@ -874,9 +891,13 @@ function viewVacation(id) {
 }
 function vacAddForm(v, tipo) {
   const t = vacType(tipo);
+  photos.remove(vacPending); vacPending = []; // fotos de un formulario que se cerró sin guardar
   modal(`<h2>${t.emoji} ${esc(t.nombre)}</h2>
     <form id="vacNoteForm" class="form" data-id="${v.id}" data-t="${t.id}">
       <div class="two"><label>Minutos<input name="min" type="number" inputmode="numeric" min="0" max="1440" placeholder="opcional"></label>${t.km ? `<label>Km<input name="km" type="number" inputmode="decimal" step="0.1" min="0" max="500" placeholder="opcional"></label>` : ""}</div>
+      <div class="vac-photo-field"><span class="small"><b>Fotos</b> <span class="muted">(opcional, hasta ${VAC_MAX_FOTOS})</span></span>
+        <div id="vacPhotos" class="vac-photos"></div>
+        <div class="row-btns"><label class="btn ghost small vac-photo-pick">📷 Hacer foto<input type="file" accept="image/*" capture="environment" id="vacCam" hidden></label><label class="btn ghost small vac-photo-pick">🖼️ Galería<input type="file" accept="image/*" multiple id="vacGal" hidden></label></div></div>
       <label>Nota<textarea name="texto" rows="3" maxlength="1000" placeholder="${t.id === "caminar" ? "Etapa Sarria – Portomarín" : t.id === "calistenia" ? "3 × 10 flexiones, 3 × 8 dominadas en un parque…" : "Qué has hecho"}"></textarea></label>
       <button class="btn primary block">Guardar</button>
     </form>`);
@@ -1359,6 +1380,8 @@ const actions = {
   deloadLater: () => { saveSettings({ descargaPospuesta: ymd(new Date(), 7) }); toast("Te lo recuerdo dentro de una semana"); rerenderKeepScroll(); },
   deloadStop: () => { if (confirmBox("¿Terminar ya la semana de descarga?")) { const d = store.get().settings.descarga; saveSettings({ descarga: { ...d, fin: ymd(new Date(), -1) } }); rerenderKeepScroll(); } },
   deloadNow: () => { if (deloadState()) return toast("Ya estás en semana de descarga"); actions.deloadStart(); },
+  vacPhotoView: (b) => { const src = b.querySelector("img")?.src; if (src) modal(`<img class="vac-photo-big" src="${src}" alt="Foto">`); },
+  vacPhotoDel: (b) => { const id = b.dataset.photoId; vacPending = vacPending.filter((x) => x !== id); photos.remove([id]); refreshVacPending(); },
   vacAdd: (b) => { const v = store.live("vacations").find((x) => x.id === b.dataset.id); if (v) vacAddForm(v, b.dataset.t); },
   vacEnd: (b) => {
     if (!confirmBox("¿Terminar las vacaciones y volver a la rutina? Lo apuntado se queda guardado.")) return;
@@ -1367,7 +1390,7 @@ const actions = {
     toast("¡De vuelta a la rutina!"); location.hash = "#/hoy";
   },
   delVac: (b) => { if (confirmBox("¿Borrar estas vacaciones y todas sus notas?")) { store.remove("vacations", b.dataset.id); location.hash = "#/vacaciones"; } },
-  delVacNote: (b) => { if (!confirmBox("¿Borrar esta nota?")) return; const v = store.live("vacations").find((x) => x.id === b.dataset.id); store.upsert("vacations", { ...v, notas: (v.notas || []).filter((n) => n.id !== b.dataset.n) }); rerenderKeepScroll(); },
+  delVacNote: (b) => { if (!confirmBox("¿Borrar esta nota?")) return; const v = store.live("vacations").find((x) => x.id === b.dataset.id); photos.remove((v.notas || []).find((n) => n.id === b.dataset.n)?.fotos); store.upsert("vacations", { ...v, notas: (v.notas || []).filter((n) => n.id !== b.dataset.n) }); rerenderKeepScroll(); },
   alarmTest: () => timer.preview($("#alarmTipo")?.value, +$("#alarmVol")?.value),
   planNext: (b) => {
     const r = lastResult;
@@ -1539,6 +1562,12 @@ document.addEventListener("change", (ev) => {
       else { store.setObject("profile", { ...store.obj("profile"), avatar: url }); render(); toast("Foto actualizada"); }
     }).catch((e) => toast(e.message));
   }
+  if ((t.id === "vacCam" || t.id === "vacGal") && t.files.length) {
+    const files = [...t.files].slice(0, VAC_MAX_FOTOS - vacPending.length);
+    t.value = "";
+    if (!files.length) { toast(`Máximo ${VAC_MAX_FOTOS} fotos por actividad`); return; }
+    Promise.all(files.map((f) => photos.add(f))).then((ids) => { vacPending.push(...ids); refreshVacPending(); }).catch((e) => toast(e.message));
+  }
   if (t.id === "importFile" && t.files[0]) {
     t.files[0].text().then((txt) => { try { store.importJson(txt); toast("Datos importados"); render(); } catch (e) { toast("No se pudo importar: " + e.message); } });
   }
@@ -1585,10 +1614,12 @@ document.addEventListener("submit", (ev) => {
     if (location.hash === `#/vacaciones/${v.id}`) render(); else location.hash = `#/vacaciones/${v.id}`;
   }
   if (f.id === "vacNoteForm") {
-    const d = Object.fromEntries(new FormData(f));
+    const fd = new FormData(f); fd.delete("vacCam"); fd.delete("vacGal");
+    const d = Object.fromEntries(fd);
     const v = store.live("vacations").find((x) => x.id === f.dataset.id);
     if (!v) return;
-    const n = { id: store.uid(), fecha: ymd(), tipo: f.dataset.t, texto: d.texto.trim(), min: +d.min || undefined, km: +d.km || undefined, creado: Date.now() };
+    const n = { id: store.uid(), fecha: ymd(), tipo: f.dataset.t, texto: d.texto.trim(), min: +d.min || undefined, km: +d.km || undefined, fotos: vacPending.length ? [...vacPending] : undefined, creado: Date.now() };
+    vacPending = [];
     store.upsert("vacations", { ...v, notas: [...(v.notas || []), n] });
     closeModal(); toast("Apuntado"); rerenderKeepScroll();
   }

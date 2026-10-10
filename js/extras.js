@@ -32,6 +32,14 @@ export const KG_TIERS = [
 // Notas de versión (la primera es la actual).
 export const CHANGELOG = [
   {
+    version: "25",
+    fecha: "2026-10-10",
+    cambios: [
+      "Diario de vacaciones: al apuntar una actividad puedes añadir fotos (hasta 6), haciéndolas con la cámara en el momento o eligiéndolas de la galería. Se ven en miniatura en cada día y en grande al tocarlas.",
+      "Las fotos se guardan reducidas en el móvil y, si tienes conectada tu cuenta de Google, en la carpeta privada de la app en tu Drive, así que también las ves en tus otros dispositivos. Al borrar una actividad se borran sus fotos.",
+    ],
+  },
+  {
     version: "24",
     fecha: "2026-10-09",
     cambios: [
