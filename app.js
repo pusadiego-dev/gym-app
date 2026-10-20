@@ -922,7 +922,7 @@ function wireHost() {
 }
 function startHost() {
   const saved = ls.get('game', null);
-  if (saved && saved.gid && saved.phase) { H.G = saved; if (!H.G.items) H.G.items = {}; H.deadline = saved.deadline || 0; if (saved.phase !== 'lobby') toast('Partida recuperada. Puedes empezar otra desde el menú.'); }
+  if (saved && saved.gid && saved.phase) { H.G = saved; if (!H.G.items) H.G.items = {}; if (!H.G.ord || !H.G.ord.trivial || H.G.ord.trivial.length !== TRIVIA.length || H.G.ord.cancion.length !== SONGS.length || H.G.ord.final.length !== FINAL.length || H.G.ord.dibujo.length !== WORDS.length) H.G.ord = newGame().ord; H.deadline = saved.deadline || 0; if (saved.phase !== 'lobby') toast('Partida recuperada. Puedes empezar otra desde el menú.'); }
   else { H.G = newGame(); ls.set('game', H.G); }
   hostRender();
   connectHost();
