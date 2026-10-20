@@ -24,70 +24,7 @@ const params = new URLSearchParams(location.search);
 
 /* ---------- contenido ---------- */
 const NAMES = ['Diegonio', 'Luismi', 'Cebollo', 'Manu Manuel', 'Adrián', 'Antrolio', 'Nacto', 'Sales Director at Alge Protech Spain'];
-const PAIR_NAMES = ['Mario y Luigi', 'Sonic y Tails', 'Crash y Coco', 'Ash y Pikachu', 'Timón y Pumba', 'Pinky y Cerebro', 'Ren y Stimpy', 'Banjo y Kazooie', 'Jak y Daxter', 'Chip y Chop', 'Bob Esponja y Patricio', 'Goku y Krilin', 'Spyro y Sparx', 'Ratchet y Clank'];
-const TRIVIA = [
-  {c: 'Dibujos', q: '¿Cómo se llama el maestro de Goku que vive en la Kame House?', o: ['El Duende Tortuga', 'Karin', 'Kaito', 'Piccolo']},
-  {c: 'Dibujos', q: 'En «Oliver y Benji», ¿cómo se llama el primer equipo de Oliver?', o: ['New Team', 'Toho', 'Muppet', 'Furano']},
-  {c: 'Cine', q: '¿A qué velocidad tiene que ir el DeLorean para viajar en el tiempo?', o: ['88 millas por hora', '100 millas por hora', '77 millas por hora', '121 millas por hora']},
-  {c: 'Series', q: 'En «Verano azul», ¿cómo se llama el barco de Chanquete?', o: ['La Dorada', 'La Gaviota', 'La Perla', 'La Niña']},
-  {c: 'Videojuegos', q: '¿De qué país es Blanka en «Street Fighter II»?', o: ['Brasil', 'México', 'India', 'Tailandia']},
-  {c: 'Bandas sonoras', q: '¿Quién compuso la banda sonora de «La guerra de las galaxias» (1977)?', o: ['John Williams', 'Hans Zimmer', 'Ennio Morricone', 'Vangelis']},
-  {c: 'Tele', q: '¿Cómo se llamaban los robots de «La bola de cristal»?', o: ['Los Electroduendes', 'Los Robotines', 'Los Chispitas', 'Los Metalines']},
-  {c: 'Series', q: '¿Cómo se llama el coche de «El coche fantástico»?', o: ['KITT', 'KARR', 'HAL', 'Herbie']},
-  {c: 'Videojuegos', q: '¿En qué año llegó a España la primera PlayStation?', o: ['1995', '1993', '1997', '1999']},
-  {c: 'Cine', q: 'En «Los Cazafantasmas», ¿qué monstruo gigante se pasea por Nueva York al final?', o: ['El hombre de malvavisco', 'Godzilla', 'Un pollo gigante', 'King Kong']},
-  {c: 'Series', q: '¿Cómo se llama la cafetería de «Friends»?', o: ['Central Perk', 'Monk’s Café', 'Luke’s', 'Moe’s']},
-  {c: 'Bandas sonoras', q: '¿Quién compuso la música de «El bueno, el feo y el malo»?', o: ['Ennio Morricone', 'John Williams', 'Bill Conti', 'Jerry Goldsmith']}
-];
-const FINAL = [
-  {c: 'Videojuegos', q: 'Tetris lo creó Alexéi Pázhitnov. ¿En qué país?', o: ['Unión Soviética', 'Japón', 'Estados Unidos', 'Hungría']},
-  {c: 'Cine', q: '¿Qué película ganó el Óscar a mejor película en la gala de 1998?', o: ['Titanic', 'Forrest Gump', 'Gladiator', 'American Beauty']},
-  {c: 'Bandas sonoras', q: '¿Quién compuso la banda sonora de «Regreso al futuro»?', o: ['Alan Silvestri', 'John Williams', 'James Horner', 'Danny Elfman']},
-  {c: 'Series', q: '¿Cómo se llama el mayordomo de «El príncipe de Bel-Air»?', o: ['Geoffrey', 'Alfred', 'Jarvis', 'Niles']},
-  {c: 'Dibujos', q: 'En «Bola de Dragón», ¿cómo se llama la nube en la que vuela Goku?', o: ['Kinton', 'Shenron', 'Kaio', 'Popo']},
-  {c: 'Dibujos', q: 'En «Los Caballeros del Zodiaco», ¿cuál es la constelación de Seiya?', o: ['Pegaso', 'Dragón', 'Cisne', 'Andrómeda']}
-];
-/* t: respuesta; s: búsqueda en el catálogo; k: palabra que debe salir en el artista o el título */
-const SONGS = [
-  {t: 'Bola de Dragón Z', s: 'Cha-La Head-Cha-La Hironobu Kageyama', k: 'cha'},
-  {t: 'Los Cazafantasmas', s: 'Ghostbusters Ray Parker Jr', k: 'ghostbusters'},
-  {t: 'Regreso al futuro', s: 'Back to the Future Alan Silvestri', k: 'future'},
-  {t: 'Los Caballeros del Zodiaco', s: 'Pegasus Fantasy Make-Up', k: 'pegasus'},
-  {t: 'Super Mario Bros.', s: 'Super Mario Bros theme Koji Kondo', k: 'mario'},
-  {t: 'Pokémon', s: 'Pokemon Theme Jason Paige', k: 'pok'},
-  {t: 'Friends', s: 'I\'ll Be There for You The Rembrandts', k: 'rembrandts'},
-  {t: 'El príncipe de Bel-Air', s: 'Fresh Prince of Bel-Air theme', k: 'bel'},
-  {t: 'Indiana Jones', s: 'Raiders March John Williams', k: 'raiders'},
-  {t: 'Parque Jurásico', s: 'Theme from Jurassic Park John Williams', k: 'jurassic'},
-  {t: 'Rocky', s: 'Gonna Fly Now Bill Conti', k: 'fly'},
-  {t: 'Top Gun', s: 'Danger Zone Kenny Loggins', k: 'danger'},
-  {t: 'Titanic', s: 'My Heart Will Go On Celine Dion', k: 'heart'},
-  {t: 'Los Simpson', s: 'The Simpsons Theme Danny Elfman', k: 'simpsons'},
-  {t: 'Mazinger Z', s: 'Mazinger Z Ichiro Mizuki', k: 'mazinger'},
-  {t: 'El Rey León', s: 'Hakuna Matata Lion King', k: 'hakuna'},
-  {t: 'Tetris', s: 'Tetris theme Korobeiniki', k: 'tetris'},
-  {t: 'The Legend of Zelda', s: 'Legend of Zelda main theme', k: 'zelda'},
-  {t: 'Misión imposible', s: 'Mission Impossible Theme Lalo Schifrin', k: 'mission'},
-  {t: 'La guerra de las galaxias', s: 'Star Wars Main Title John Williams', k: 'star wars'},
-  {t: 'Sonic the Hedgehog', s: 'Green Hill Zone Sonic', k: 'green hill'},
-  {t: 'Oliver y Benji', s: 'Captain Tsubasa Moete Hero', k: 'hero'}
-];
-const WORDS = [
-  {w: 'Pac-Man', alt: ['pacman', 'comecocos']}, {w: 'Tiburón', alt: ['jaws']}, {w: 'E.T.', alt: ['et', 'e t', 'el extraterrestre']},
-  {w: 'Los Pitufos', alt: ['pitufo']}, {w: 'Titanic', alt: []}, {w: 'Super Mario', alt: ['mario', 'mario bros', 'super mario bros']},
-  {w: 'Doraemon', alt: []}, {w: 'Batman', alt: []}, {w: 'El Rey León', alt: []}, {w: 'Tetris', alt: []},
-  {w: 'Mazinger Z', alt: ['mazinger']}, {w: 'Shin Chan', alt: ['shinchan']}
-];
-const EMOJI = [
-  {t: 'Titanic', e: '🚢🧊💔'}, {t: 'El Rey León', e: '🦁👑🌅'}, {t: 'Parque Jurásico', e: '🦖🏝️🚙'}, {t: 'Tiburón', e: '🦈🏖️🎶'},
-  {t: 'Regreso al futuro', e: '🚗⚡🕰️'}, {t: 'Los Cazafantasmas', e: '👻🚫🔫'}, {t: 'E.T.', e: '👽🚲🌕'}, {t: 'Toy Story', e: '🤠🚀🧸'},
-  {t: 'Buscando a Nemo', e: '🐠🔎🌊'}, {t: 'Harry Potter', e: '⚡🧙‍♂️👓'}, {t: 'El señor de los anillos', e: '💍🌋🧝'}, {t: 'Matrix', e: '💊🕶️💻'},
-  {t: 'Shrek', e: '🟢👹🏰'}, {t: 'Indiana Jones', e: '🤠🐍🗿'}, {t: 'Top Gun', e: '✈️🕶️🏐'}, {t: 'Rocky', e: '🥊🥚🏃'},
-  {t: 'Forrest Gump', e: '🏃🍫🪶'}, {t: 'Los Simpson', e: '🍩🟡🛋️'}, {t: 'Pokémon', e: '⚡🐭🔴'}, {t: 'Bola de Dragón', e: '🐉🟠⭐'},
-  {t: 'Oliver y Benji', e: '⚽🇯🇵🥅'}, {t: 'Verano azul', e: '☀️🚲⛵'}, {t: 'Friends', e: '☕🛋️👫'}, {t: 'El coche fantástico', e: '🚗🗣️🔴'},
-  {t: 'Super Mario', e: '🍄🔧👨'}, {t: 'Pac-Man', e: '🟡👻🍒'}, {t: 'Los Pitufos', e: '🔵🍄🏘️'}, {t: 'Doraemon', e: '🐱🔵🚪'},
-  {t: 'Gremlins', e: '🐾💧🌙'}, {t: 'Los Goonies', e: '🗺️🏴‍☠️💎'}
-];
+const {PAIR_NAMES, TRIVIA, FINAL, SONGS, WORDS, EMOJI} = window.VR26;
 const ROUNDS = [
   {id: 'trivial', kind: 'quiz', name: 'Cultura de sofá', steps: 10, secs: 20, pool: 'TRIVIA', rules: [
     'Pregunta en la tele, respuesta en el móvil. Cada uno contesta en el suyo.',
@@ -99,10 +36,10 @@ const ROUNDS = [
     'Cuenta el mejor de la pareja. Exacto: 10 puntos. A 5 o menos: 7. A 10 o menos: 5.']},
   {id: 'dibujo', kind: 'dibujo', name: 'Dibújamelo', steps: 4, secs: 80, rules: [
     'En cada pareja, uno dibuja en su móvil y el otro lo ve en el suyo y escribe la respuesta.',
-    'Todos los títulos son de pelis, series, dibujos o videojuegos. Prohibido escribir letras o números.',
+    'Hay pelis, series, dibujos, videojuegos, comida y cosas de Zaragoza. Prohibido escribir letras o números.',
     'Primera pareja en acertar: 5 puntos. Segunda: 4. Tercera: 3. El resto que acierte: 2. Se turna quién dibuja.']},
   {id: 'cancion', kind: 'cancion', name: '¿Qué suena?', steps: 8, rules: [
-    'La música la pone el portátil: fragmentos de 2, 5, 10 y 20 segundos de una canción al azar.',
+    'La música la pone el portátil: fragmentos de 2, 5, 10 y 20 segundos de una canción al azar (tele, cine, videojuegos y rock español).',
     'Cada pareja elige una respuesta entre cuatro. Vale la primera que marque cualquiera de los dos.',
     'Si acertáis durante el primer fragmento: 4 puntos. Luego 3, 2 y 1.']},
   {id: 'letras', kind: 'letras', name: 'Letras', steps: 3, secs: 45, rules: [
@@ -110,7 +47,7 @@ const ROUNDS = [
     'Al acabar, el jurado (todos) valida las palabras en la tele.',
     'Cuenta la palabra más larga de la pareja: tantos puntos como letras. Con las nueve, 18.']},
   {id: 'bingo', kind: 'bingo', name: 'Bingo de emojis', steps: 1, rules: [
-    'Cada uno tiene en el móvil un cartón con nueve pelis y series.',
+    'Cada uno tiene en el móvil un cartón con nueve pelis, series, dibujos o videojuegos.',
     'En la tele salen pistas en emojis. Si es una de tu cartón, márcala.',
     'Primera línea: 5 puntos. Bingo: 10 y se acaba. Cantar en falso: −2.']},
   {id: 'tapas', kind: 'tapas', name: 'Concurso de tapas', steps: 1, rules: [
@@ -129,7 +66,32 @@ const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const TAPA_PTS = [10, 7, 5, 3];
 
 /* ---------- lógica compartida ---------- */
-function bingoCard(gid, pid) { return shuffle(range(EMOJI.length), seeded(gid + ':' + pid)).slice(0, 9); }
+const BINGO_SIZE = 30;
+function bingoDeck(gid) { return shuffle(range(EMOJI.length), seeded(gid + '#deck')).slice(0, BINGO_SIZE); }
+function bingoCard(gid, pid) { return shuffle(bingoDeck(gid), seeded(gid + ':' + pid)).slice(0, 9); }
+/* ---------- que no se repitan preguntas entre partidas ---------- */
+function spreadCats(order, catOf) {
+  const rest = order.slice(), out = [];
+  while (rest.length) {
+    const last = out.slice(-2).map(catOf);
+    let k = rest.findIndex(i => !last.includes(catOf(i)));
+    if (k < 0) k = 0;
+    out.push(rest.splice(k, 1)[0]);
+  }
+  return out;
+}
+function freshOrder(kind, items, keyOf, catOf) {
+  const all = ls.get('used', {}); const idx = range(items.length);
+  let used = new Set(all[kind] || []);
+  if (idx.every(i => used.has(keyOf(items[i])))) { used = new Set(); all[kind] = []; ls.set('used', all); }
+  const order = [...shuffle(idx.filter(i => !used.has(keyOf(items[i])))), ...shuffle(idx.filter(i => used.has(keyOf(items[i]))))];
+  return catOf ? spreadCats(order, i => catOf(items[i])) : order;
+}
+function markUsed(kind, key) {
+  const u = ls.get('used', {}); const list = u[kind] || [];
+  if (list.includes(key)) return;
+  list.push(key); u[kind] = list; ls.set('used', u);
+}
 function canBuild(word, letters) {
   const c = {}; for (const l of letters) c[l] = (c[l] || 0) + 1;
   for (const ch of upLetters(word)) { if (!c[ch]) return false; c[ch]--; }
@@ -230,15 +192,16 @@ const tilesWord = (w, cls = 'tl') => [...w].map(ch => ch === ' ' ? '<span style=
 const optLetter = i => 'ABCD'[i];
 const eqHTML = on => `<div class="eq${on ? ' on' : ''}" aria-hidden="true">${'<i></i>'.repeat(6)}</div>`;
 
-function compressImage(file) {
+function compressImage(file, m = 560, limit = 90000, square = false) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file); const img = new Image();
     img.onload = () => {
-      const m = 560, k = Math.min(1, m / Math.max(img.naturalWidth, img.naturalHeight));
-      const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      const iw = img.naturalWidth, ih = img.naturalHeight, side = Math.min(iw, ih);
+      const sw = square ? side : iw, sh = square ? side : ih, k = Math.min(1, m / Math.max(sw, sh));
+      const c = document.createElement('canvas'); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+      c.getContext('2d').drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
       let q = .72, d = c.toDataURL('image/jpeg', q);
-      while (d.length > 90000 && q > .3) { q -= .1; d = c.toDataURL('image/jpeg', q); }
+      while (d.length > limit && q > .3) { q -= .1; d = c.toDataURL('image/jpeg', q); }
       res(d);
     };
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('img')); };
@@ -251,7 +214,7 @@ const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884
 function brokerUrl(i) { return params.get('broker') || BROKERS[i] || BROKERS[0]; }
 function makeNet(code, url, isHost, me) {
   const base = 'vr26/' + code + '/';
-  const L = {st: [], peers: [], img: [], conn: []};
+  const L = {st: [], peers: [], img: [], av: [], conn: []};
   const peers = new Map(), seen = new Map();
   let mine = {}, pubT = 0, lastPub = 0, peersT = 0, up = false;
   const client = window.mqtt.connect(url, {clientId: 'vr' + rid(10), keepalive: 30, reconnectPeriod: 2500, connectTimeout: 9000, clean: true});
@@ -262,7 +225,7 @@ function makeNet(code, url, isHost, me) {
   };
   client.on('connect', () => {
     up = true;
-    client.subscribe([base + 'st', base + 'p/+', base + 'img/+'], {qos: 0});
+    client.subscribe([base + 'st', base + 'p/+', base + 'img/+', base + 'av/+'], {qos: 0});
     if (!isHost && Object.keys(mine).length) pubPres();
     L.conn.forEach(f => f(true));
   });
@@ -275,6 +238,7 @@ function makeNet(code, url, isHost, me) {
     if (t === 'st') { if (!isHost) L.st.forEach(f => f(data)); }
     else if (t.startsWith('p/')) { const id = t.slice(2, 40); peers.set(id, {peer: id, presence: data, isMe: id === me}); seen.set(id, Date.now()); firePeers(); }
     else if (t.startsWith('img/')) { const id = t.slice(4, 40); L.img.forEach(f => f(id, data)); }
+    else if (t.startsWith('av/')) { const id = t.slice(3, 40); L.av.forEach(f => f(id, data)); }
   });
   const api = {
     emit(topic, data) { if (client.connected) client.publish(base + 'st', JSON.stringify(data), {retain: true, qos: 0}); return Promise.resolve(); },
@@ -285,6 +249,8 @@ function makeNet(code, url, isHost, me) {
       return Promise.resolve();
     },
     publishImg(data) { client.publish(base + 'img/' + me, JSON.stringify(data), {retain: true, qos: 1}); },
+    publishAv(data) { client.publish(base + 'av/' + me, JSON.stringify(data), {retain: true, qos: 1}); },
+    onAv(f) { L.av.push(f); return () => {}; },
     peers() { return [...peers.values()]; },
     seenAt(id) { return seen.get(id) || 0; },
     onPeers(f) { L.peers.push(f); return () => {}; },
@@ -332,7 +298,7 @@ async function findTrack(song) {
   const rs = (d && d.results || []).filter(r => r.previewUrl);
   const k = norm(song.k);
   const good = rs.filter(r => norm(r.trackName + ' ' + r.artistName + ' ' + (r.collectionName || '')).includes(k));
-  const pick = (good.length ? good : rs)[0];
+  const pick = good[0];
   if (!pick) throw new Error('none');
   return {url: pick.previewUrl, label: `${pick.trackName} · ${pick.artistName}`};
 }
@@ -344,12 +310,12 @@ let role = gameCode ? 'player' : ls.get('role', null);
 
 /* ================= PRESENTADOR ================= */
 const H = {G: null, deadline: 0, lastSend: 0, sendT: 0, online: new Set(), onStr: '', menu: false, confirmNew: false, renderQ: false, saveT: 0, sorteoAnim: false,
-  imgs: ls.get('imgs', {}), audio: null, musicT: 0, music: {}, musicCheck: false, playing: false};
+  imgs: ls.get('imgs', {}), avs: ls.get('avs', {}), audio: null, musicT: 0, music: {}, musicCheck: false, playing: false};
 
 function newGame() {
   return {
     gid: rid(6), bi: 0, phase: 'lobby', players: {}, pairs: [], r: -1, s: 0, step: null, ans: {}, res: null, draws: {}, log: [], deadline: 0, tapas: null, items: {},
-    ord: {trivial: shuffle(range(TRIVIA.length)), final: range(FINAL.length), dibujo: shuffle(range(WORDS.length)), cancion: shuffle(range(SONGS.length))}
+    ord: {trivial: freshOrder('q', TRIVIA, x => x.q, x => x.c), final: freshOrder('f', FINAL, x => x.q, x => x.c), dibujo: freshOrder('w', WORDS, x => x.w), cancion: freshOrder('s', SONGS, x => x.t, x => x.g)}
   };
 }
 const curRound = () => ROUNDS[H.G.r];
@@ -443,6 +409,13 @@ function hostImg(pid, data) {
   if (!ls.set('imgs', H.imgs)) { /* sin espacio: las fotos siguen en memoria */ }
   changed();
 }
+function hostAv(pid, data) {
+  const G = H.G; if (!G || !data || data.g !== G.gid) return;
+  const img = isImg(data.img) ? data.img : null;
+  if ((H.avs[pid] || null) === img) return;
+  if (img) H.avs[pid] = img; else delete H.avs[pid];
+  ls.set('avs', H.avs); renderSoon();
+}
 function ingest(pid, pr) {
   const G = H.G, st = G.step, R = curRound(), a = pr.a, prev = G.ans[pid], now = Date.now();
   const pair = pairOf(pid); if (!pair) return false;
@@ -523,7 +496,8 @@ function drawPairs() {
   G.pairs = pairs; G.log = []; G.tapas = null;
 }
 function songOptions(idx) {
-  const others = shuffle(SONGS.map((s, i) => i).filter(i => i !== idx)).slice(0, 3).map(i => SONGS[i].t);
+  const g = SONGS[idx].g; const pool = SONGS.map((s, i) => i).filter(i => i !== idx);
+  const others = [...shuffle(pool.filter(i => SONGS[i].g === g)), ...shuffle(pool.filter(i => SONGS[i].g !== g))].slice(0, 3).map(i => SONGS[i].t);
   const o = shuffle([SONGS[idx].t, ...others]);
   return {o, ok: o.indexOf(SONGS[idx].t)};
 }
@@ -531,15 +505,16 @@ function makeStep(R, s) {
   const G = H.G;
   const liveOf = p => { const l = p.m.filter(id => !G.players[id] || !G.players[id].off); return l.length ? l : p.m; };
   switch (R.kind) {
-    case 'quiz': { const pool = R.pool === 'FINAL' ? FINAL : TRIVIA; const item = pool[G.ord[R.id][s % pool.length]]; const order = shuffle([0, 1, 2, 3]); return {q: item.q, c: item.c, o: order.map(i => item.o[i]), ok: order.indexOf(0)}; }
+    case 'quiz': { const pool = R.pool === 'FINAL' ? FINAL : TRIVIA; const item = pool[G.ord[R.id][s % pool.length]]; markUsed(R.pool === 'FINAL' ? 'f' : 'q', item.q); const order = shuffle([0, 1, 2, 3]); return {q: item.q, c: item.c, o: order.map(i => item.o[i]), ok: order.indexOf(0)}; }
     case 'cifras': { const g = genCifras(); return {t: g.t, n: g.n, sol: null}; }
     case 'letras': return {l: genLetras()};
-    case 'dibujo': { const word = WORDS[G.ord.dibujo[s % WORDS.length]]; const dr = {}; for (const p of G.pairs) { const l = liveOf(p); dr[p.id] = l[s % l.length]; } return {word, dr}; }
+    case 'dibujo': { const word = WORDS[G.ord.dibujo[s % WORDS.length]]; markUsed('w', word.w); const dr = {}; for (const p of G.pairs) { const l = liveOf(p); dr[p.id] = l[s % l.length]; } return {word, dr}; }
     case 'cancion': {
       G.songPos = G.songPos == null ? 0 : G.songPos;
       let idx = null;
       for (let tries = 0; tries < SONGS.length; tries++) { const c = G.ord.cancion[G.songPos % SONGS.length]; G.songPos++; const m = H.music[c]; if (!m || m.url) { idx = c; break; } }
       if (idx == null) idx = G.ord.cancion[0];
+      markUsed('s', SONGS[idx].t);
       return Object.assign({idx, t: SONGS[idx].t, stage: 0}, songOptions(idx));
     }
     case 'bingo': return {cl: [], cur: null, prev: null, li: null, bi: null, msg: ''};
@@ -560,7 +535,7 @@ function startStep(s) {
   changed(); send(true);
 }
 function nextClue() {
-  const st = H.G.step; const left = range(EMOJI.length).filter(i => !st.cl.includes(i));
+  const st = H.G.step; const left = bingoDeck(H.G.gid).filter(i => !st.cl.includes(i));
   if (!left.length) return;
   if (st.cur != null) st.prev = EMOJI[st.cur].t;
   const i = left[Math.floor(Math.random() * left.length)]; st.cl.push(i); st.cur = i; st.msg = '';
@@ -696,7 +671,7 @@ function hostTop() {
 function marcadorHTML() {
   const G = H.G; if (!G.pairs.length || G.phase === 'sorteo' || G.phase === 'fin') return '';
   const max = Math.max(...G.pairs.map(p => p.sc));
-  return `<section class="marcador" aria-label="Marcador">${G.pairs.map(p => `<div class="mc${p.sc === max && max > 0 ? ' lead' : ''}"><div><div class="nm">${esc(p.n)}${p.x2 === G.r && G.r >= 0 ? ' <span class="pill x2">×2</span>' : ''}</div><div class="ms">${p.m.map(m => esc(pname(m))).join(' · ')}</div></div><span class="tn wide">${p.sc}</span></div>`).join('')}</section>`;
+  return `<section class="marcador" aria-label="Marcador">${G.pairs.map(p => `<div class="mc${p.sc === max && max > 0 ? ' lead' : ''}"><div><div class="nm">${esc(p.n)}${p.x2 === G.r && G.r >= 0 ? ' <span class="pill x2">×2</span>' : ''}</div><div class="ms">${p.m.map(m => who(m)).join(' ')}</div></div><span class="tn wide">${p.sc}</span></div>`).join('')}</section>`;
 }
 function ptsHTML(pts) {
   const e = effPts(pts); const ids = H.G.pairs.map(p => p.id).filter(id => e[id]);
@@ -711,8 +686,11 @@ function gotHTML() {
   const entry = R.kind === 'tapas' && st.mode === 'entry';
   const lab = R.kind === 'dibujo' ? 'Han acertado' : entry ? 'Han subido su tapa' : R.kind === 'tapas' ? 'Han votado' : R.kind === 'bingo' ? 'Jugando' : 'Han respondido';
   const done = p => R.kind === 'dibujo' ? G.ans[p] && G.ans[p].ok : entry ? !!G.items[p] : R.kind === 'tapas' ? G.ans[p] && G.ans[p].f : !!G.ans[p];
-  return `<div class="lbl">${lab}</div><div class="chips">${ids.map(p => `<span class="chip${done(p) ? ' done' : ''}${H.online.has(p) ? ' on' : ''}"><span class="dot"></span>${esc(pname(p))}</span>`).join('')}</div>`;
+  return `<div class="lbl">${lab}</div><div class="chips">${ids.map(p => `<span class="chip${done(p) ? ' done' : ''}${H.online.has(p) ? ' on' : ''}"><span class="dot"></span>${avTag(p)}${esc(pname(p))}</span>`).join('')}</div>`;
 }
+const initial = n => esc([...String(n || '?').trim()][0] || '?').toUpperCase();
+const avTag = (pid, cls = '') => H.avs[pid] ? `<img class="av ${cls}" src="${H.avs[pid]}" alt="">` : `<span class="av ini ${cls}" aria-hidden="true">${initial(pname(pid))}</span>`;
+const who = (pid, cls = '') => `<span class="who">${avTag(pid, cls)}${esc(pname(pid))}</span>`;
 const imgTag = (pid, cls = '') => H.imgs[pid] ? `<img class="${cls}" src="${H.imgs[pid]}" alt="">` : `<span class="noimg ${cls}">Sin foto</span>`;
 function hostMain() {
   const G = H.G;
@@ -723,7 +701,7 @@ function hostMain() {
       <section class="board stack">
         <h2 class="title" style="font-size:clamp(1.3rem,2.6vw,2rem)">Jugadores (${ids.length})</h2>
         <p>Escanead el código con la cámara del móvil y tocad vuestro nombre. Las parejas las sortea la aplicación.</p>
-        <div class="chips">${ids.length ? ids.map(p => `<span class="chip${H.online.has(p) ? ' on' : ''}"><span class="dot"></span>${esc(pname(p))}${G.players[p].off ? ' (sin móvil)' : ''}<button data-act="kick" data-v="${esc(p)}" aria-label="Quitar a ${esc(pname(p))}">×</button></span>`).join('') : '<span class="muted">Todavía no ha entrado nadie.</span>'}</div>
+        <div class="chips">${ids.length ? ids.map(p => `<span class="chip${H.online.has(p) ? ' on' : ''}"><span class="dot"></span>${avTag(p)}${esc(pname(p))}${G.players[p].off ? ' (sin móvil)' : ''}<button data-act="kick" data-v="${esc(p)}" aria-label="Quitar a ${esc(pname(p))}">×</button></span>`).join('') : '<span class="muted">Todavía no ha entrado nadie.</span>'}</div>
         <form id="addoff" class="row"><input class="txt" id="offname" maxlength="40" placeholder="Añadir a alguien sin móvil" style="flex:1;min-width:0"><button class="btn ghost" type="submit">Añadir</button></form>
         <div class="row end"><button class="btn big" data-act="next"${ids.length < 2 ? ' disabled' : ''}>Sortear parejas</button></div>
       </section></div>
@@ -732,7 +710,7 @@ function hostMain() {
   if (G.phase === 'sorteo') {
     const anim = H.sorteoAnim; H.sorteoAnim = false;
     return `<section class="center"><div class="lbl">El sorteo ha hablado</div><h1 class="title">Parejas del campeonato</h1></section>
-    <div class="pairgrid">${G.pairs.map((p, i) => `<article class="pairc${anim ? ' flip' : ''}" style="--d:${i * .8}s"><div class="lbl">Pareja ${i + 1}</div><h3>${esc(p.n)}</h3><p class="mem">${p.m.map(m => esc(pname(m))).join(' &amp; ')}</p></article>`).join('')}</div>
+    <div class="pairgrid">${G.pairs.map((p, i) => `<article class="pairc${anim ? ' flip' : ''}" style="--d:${i * .8}s"><div class="lbl">Pareja ${i + 1}</div><h3>${esc(p.n)}</h3><div class="mem avs">${p.m.map(m => who(m, 'lg')).join('')}</div></article>`).join('')}</div>
     <div class="row end"><button class="btn ghost" data-act="redraw">Volver a sortear</button><button class="btn big" data-act="next">Empezar la prueba 1</button></div>`;
   }
   if (G.phase === 'intro') {
@@ -757,7 +735,7 @@ function hostMain() {
     const gain = roundGain(G.r); const sorted = G.pairs.slice().sort((a, b) => b.sc - a.sc); const max = Math.max(1, ...sorted.map(p => p.sc));
     const nextR = ROUNDS[G.r + 1];
     return `<section class="board stack"><div class="lbl">Clasificación tras la prueba ${G.r + 1}</div><h1 class="title">${esc(curRound().name)}</h1>
-      <div class="standing">${sorted.map((p, i) => `<div class="srow"><div class="pos">${i + 1}</div><div><div class="nm">${esc(p.n)} <span class="gain">${gain[p.id] ? `+${gain[p.id]}` : ''}</span></div><div class="muted">${p.m.map(m => esc(pname(m))).join(' · ')}</div><div class="bar"><i style="width:${Math.max(2, p.sc / max * 100)}%"></i></div></div><span class="tn wide">${p.sc}</span></div>`).join('')}</div></section>
+      <div class="standing">${sorted.map((p, i) => `<div class="srow"><div class="pos">${i + 1}</div><div><div class="nm">${esc(p.n)} <span class="gain">${gain[p.id] ? `+${gain[p.id]}` : ''}</span></div><div class="muted avs">${p.m.map(m => who(m)).join(' ')}</div><div class="bar"><i style="width:${Math.max(2, p.sc / max * 100)}%"></i></div></div><span class="tn wide">${p.sc}</span></div>`).join('')}</div></section>
       <div class="row end"><button class="btn big" data-act="next">${nextR ? `Prueba ${G.r + 2}: ${esc(nextR.name)}` : 'Ver a los campeones'}</button></div>`;
   }
   if (G.phase === 'fin') {
@@ -767,8 +745,8 @@ function hostMain() {
     const best = G.tapas && G.tapas.length && G.tapas[0][1] > 0 ? G.tapas.filter(t => t[3] === 1) : [];
     return `<section class="hero"><div class="lbl">Campeones del Mundo · Villaraso 2026 · Edición otoño</div>
       <h1 class="rname">${tie ? '¡Empate!' : esc(sorted[0].n)}</h1>
-      <p class="title" style="font-size:clamp(1.2rem,3vw,2rem);color:var(--cream);text-shadow:none">${tie ? 'Desempate a los dados de póker: la mejor jugada gana.' : sorted[0].m.map(m => esc(pname(m))).join(' &amp; ')}</p></section>
-      <div class="podium">${pod.map((p, i) => p ? `<div class="p${[2, 1, 3][i]}"><div class="nm">${esc(p.n)}</div><div class="muted">${p.m.map(m => esc(pname(m))).join(' · ')}</div><span class="tn wide">${p.sc}</span><div class="plat">${[2, 1, 3][i]}</div></div>` : '<div></div>').join('')}</div>
+      <p class="title" style="font-size:clamp(1.2rem,3vw,2rem);color:var(--cream);text-shadow:none">${tie ? 'Desempate a los dados de póker: la mejor jugada gana.' : `<span class="avs" style="justify-content:center">${sorted[0].m.map(m => who(m, 'xl')).join('')}</span>`}</p></section>
+      <div class="podium">${pod.map((p, i) => p ? `<div class="p${[2, 1, 3][i]}"><div class="nm">${esc(p.n)}</div><div class="muted avs">${p.m.map(m => who(m)).join(' ')}</div><span class="tn wide">${p.sc}</span><div class="plat">${[2, 1, 3][i]}</div></div>` : '<div></div>').join('')}</div>
       ${sorted.length > 3 ? `<div class="board"><div class="standing">${sorted.slice(3).map((p, i) => `<div class="srow"><div class="pos">${i + 4}</div><div class="nm">${esc(p.n)}</div><span class="tn wide">${p.sc}</span></div>`).join('')}</div></div>` : ''}
       ${best.length ? `<div class="board stack"><div class="lbl">Mejor tapa de la edición</div><div class="tapgrid">${best.map(t => `<div class="tapc">${imgTag(t[0])}<div><b>${esc(G.items[t[0]] ? G.items[t[0]].n : '')}</b><span>${esc(pname(t[0]))}</span></div></div>`).join('')}</div></div>` : ''}`;
   }
@@ -807,8 +785,8 @@ function hostPlay() {
       break;
     }
     case 'bingo':
-      main = `${head}<div class="center"><div class="lbl">Pista ${st.cl.length} de ${EMOJI.length}</div><div class="emoji">${st.cur != null ? EMOJI[st.cur].e : ''}</div>${st.prev ? `<p class="muted">La anterior era: <b>${esc(st.prev)}</b></p>` : ''}${st.msg ? `<div class="banner">${esc(st.msg)}</div>` : ''}${st.li ? `<p class="muted">Línea cantada por ${esc(pname(st.li))}</p>` : ''}</div>`;
-      extra = `<button class="btn ghost" data-act="clue"${st.bi || st.cl.length >= EMOJI.length ? ' disabled' : ''}>Siguiente pista</button>`; break;
+      main = `${head}<div class="center"><div class="lbl">Pista ${st.cl.length} de ${BINGO_SIZE}</div><div class="emoji">${st.cur != null ? EMOJI[st.cur].e : ''}</div>${st.prev ? `<p class="muted">La anterior era: <b>${esc(st.prev)}</b></p>` : ''}${st.msg ? `<div class="banner">${esc(st.msg)}</div>` : ''}${st.li ? `<p class="muted">Línea cantada por ${esc(pname(st.li))}</p>` : ''}</div>`;
+      extra = `<button class="btn ghost" data-act="clue"${st.bi || st.cl.length >= BINGO_SIZE ? ' disabled' : ''}>Siguiente pista</button>`; break;
     case 'tapas':
       if (st.mode === 'entry') {
         const ids = Object.keys(G.items);
@@ -920,7 +898,7 @@ const HACT = {
   relobby: () => { const G = H.G; stopMusic(); G.pairs = []; G.r = -1; G.phase = 'lobby'; G.step = null; G.res = null; G.log = []; G.tapas = null; H.deadline = 0; H.menu = false; changed(); send(true); },
   asknew: () => { H.confirmNew = true; hostRender(); },
   nonew: () => { H.confirmNew = false; hostRender(); },
-  newgame: () => { stopMusic(); const bi = H.G.bi; H.G = newGame(); H.G.bi = bi; H.imgs = {}; ls.set('imgs', {}); H.menu = false; H.confirmNew = false; H.deadline = 0; ls.set('game', H.G); location.reload(); },
+  newgame: () => { stopMusic(); const bi = H.G.bi; H.G = newGame(); H.G.bi = bi; H.imgs = {}; ls.set('imgs', {}); H.avs = {}; ls.set('avs', {}); H.menu = false; H.confirmNew = false; H.deadline = 0; ls.set('game', H.G); location.reload(); },
   role: () => { role = null; ls.del('role'); render(); }
 };
 function connectHost() {
@@ -938,6 +916,7 @@ function wireHost() {
   if (hostWired) return; hostWired = true;
   room.onPeers(() => hostPeers());
   room.onImg((pid, data) => hostImg(pid, data));
+  room.onAv((pid, data) => hostAv(pid, data));
   hostPeers(); send(true);
   setInterval(() => { if (role === 'host') { hostPeers(); send(true); } }, 3000);
 }
@@ -951,14 +930,17 @@ function startHost() {
 }
 
 /* ================= JUGADOR ================= */
-const P = {pid: null, name: ls.get('name.' + gameCode, ''), S: null, sig: '', pres: {}, deadline: 0, L: {}, upd: null, strokes: [], lastDraw: '', drawT: 0, imgs: {}, myTapa: null};
+const P = {pid: null, name: ls.get('name.' + gameCode, ''), S: null, sig: '', pres: {}, deadline: 0, L: {}, upd: null, strokes: [], lastDraw: '', drawT: 0, imgs: {}, myTapa: null, avs: {}, myAv: ls.get('av', null), avStep: false};
 P.pid = ls.get('pid', null) || (() => { const p = rid(10); ls.set('pid', p); return p; })();
 function setPres(patch) {
   for (const k in patch) { if (patch[k] === null) delete P.pres[k]; else P.pres[k] = patch[k]; }
   if (room) room.presence(patch);
 }
 function myPair() { const S = P.S; return S && S.pairs.find(p => p.m.includes(P.pid)); }
-const nm = pid => (P.S && P.S.names[pid]) || 'Alguien';
+const nm = pid => (P.S && P.S.names[pid]) || (pid === P.pid && P.name) || 'Alguien';
+const pavSrc = pid => P.avs[pid] || (pid === P.pid ? P.myAv : null);
+const pav = (pid, cls = '') => pavSrc(pid) ? `<img class="av ${cls}" src="${pavSrc(pid)}" alt="">` : `<span class="av ini ${cls}" aria-hidden="true">${initial(nm(pid))}</span>`;
+const pwho = (pid, cls = '') => `<span class="who">${pav(pid, cls)}${esc(nm(pid))}</span>`;
 function onState(S) {
   if (!S || typeof S !== 'object' || typeof S.ph !== 'string' || !Array.isArray(S.pairs) || !S.names || S.gid !== gameCode) return;
   if (P.S && S.at && P.S.at && S.at < P.S.at) return;
@@ -978,15 +960,24 @@ function sigOf() {
 function playerRender() {
   const app = $('#app'); app.className = 'phone';
   if (!P.name) { if (!$('#namepick') || P.sig !== 'name' + Object.values((P.S && P.S.names) || {}).join()) { P.sig = 'name' + Object.values((P.S && P.S.names) || {}).join(); app.innerHTML = phoneHead() + nameForm(); } return; }
+  if (P.avStep) { if (P.sig !== 'av') { P.sig = 'av'; P.upd = null; app.innerHTML = phoneHead() + avatarForm(); } return; }
   const sig = sigOf();
   if (sig === P.sig && P.upd) { P.upd(); return; }
   P.sig = sig; P.upd = null;
-  app.innerHTML = phoneHead() + `<main class="stack">${phoneMain()}</main><div class="row" style="justify-content:center"><button class="linkbtn" data-act="rename">Cambiar mi nombre</button></div>`;
+  app.innerHTML = phoneHead() + `<main class="stack">${phoneMain()}</main><div class="row" style="justify-content:center"><button class="linkbtn" data-act="rename">Cambiar mi nombre</button><button class="linkbtn" data-act="avchange">Cambiar mi foto</button></div>`;
   if (P.upd) P.upd();
 }
 function phoneHead() {
   const mp = myPair();
-  return `<header class="phead">${logoHTML(true)}<div class="me">${P.name ? `<b>${esc(P.name)}</b>` : ''}${mp ? esc(mp.n) : ''}</div></header>`;
+  return `<header class="phead">${logoHTML(true)}<div class="mewrap"><div class="me">${P.name ? `<b>${esc(P.name)}</b>` : ''}${mp ? esc(mp.n) : ''}</div>${P.name ? pav(P.pid) : ''}</div></header>`;
+}
+function avatarForm() {
+  return `<section class="board stack center" id="avpick"><div class="lbl">Tu foto de jugador</div><h1 class="title" style="font-size:1.6rem">¿Ponemos cara a ${esc(P.name)}?</h1>
+  <div class="avbig" id="avprev">${P.myAv ? `<img src="${P.myAv}" alt="Tu foto">` : '<span aria-hidden="true">🙂</span>'}</div>
+  <p class="muted">Saldrá en la tele junto a tu nombre y en el marcador.</p>
+  <label class="btn full" for="avcam">Hacer una foto</label><input type="file" id="avcam" accept="image/*" capture="user" hidden>
+  <label class="btn ghost full" for="avfile">Subir una imagen</label><input type="file" id="avfile" accept="image/*" hidden>
+  <button class="btn big full" data-act="avdone" id="avdone">${P.myAv ? 'Listo, a jugar' : 'Entrar sin foto'}</button></section>`;
 }
 function nameForm() {
   const taken = new Set(Object.entries((P.S && P.S.names) || {}).filter(([id]) => id !== P.pid).map(([, n]) => n));
@@ -999,12 +990,11 @@ function phoneMain() {
   if (!S) return `<section class="board center"><div class="lbl">${roomState === 'none' ? 'Sin conexión' : 'Conectando'}</div><h2 class="title" style="font-size:1.6rem">${roomState === 'none' ? 'No llego a la partida' : 'Esperando al presentador…'}</h2><p class="muted">${roomState === 'none' ? 'Comprueba que tienes internet (mejor el wifi de la casa). Lo sigo intentando solo.' : 'Cuando la pantalla del portátil esté abierta, aparecerás en la sala.'}</p></section>`;
   const mp = myPair(); const R = ROUNDS[S.r];
   if (S.ph === 'lobby') {
-    const names = Object.values(S.names);
-    return `<section class="board stack"><div class="lbl">Sala de espera</div><h1 class="bigname">Hola, ${esc(P.name)}</h1><p>Ya estás dentro. Cuando estemos todos, el presentador sorteará las parejas.</p><div class="chips">${names.map(n => `<span class="chip on"><span class="dot"></span>${esc(n)}</span>`).join('')}</div></section>`;
+    return `<section class="board stack"><div class="lbl">Sala de espera</div><h1 class="bigname">Hola, ${esc(P.name)}</h1><p>Ya estás dentro. Cuando estemos todos, el presentador sorteará las parejas.</p><div class="chips">${Object.keys(S.names).map(id => `<span class="chip on"><span class="dot"></span>${pav(id)}${esc(S.names[id])}</span>`).join('')}</div></section>`;
   }
   if (!mp) return `<section class="board stack"><div class="lbl">Sin pareja</div><h2 class="title" style="font-size:1.5rem">Te has unido tarde</h2><p>El presentador te puede meter en una pareja desde su menú. Mientras, mira la tele.</p></section>`;
   const partners = mp.m.filter(m => m !== P.pid).map(m => esc(nm(m))).join(' y ');
-  if (S.ph === 'sorteo') return `<section class="board center"><div class="lbl">Tu pareja</div><div class="bigname flip">${partners || 'Juegas solo'}</div><p class="title" style="font-size:1.3rem">${esc(mp.n)}</p></section>`;
+  if (S.ph === 'sorteo') return `<section class="board center"><div class="lbl">Tu pareja</div><div class="avs flip" style="justify-content:center">${mp.m.filter(m => m !== P.pid).map(m => pav(m, 'xl')).join('')}</div><div class="bigname flip">${partners || 'Juegas solo'}</div><p class="title" style="font-size:1.3rem">${esc(mp.n)}</p></section>`;
   if (S.ph === 'intro') {
     const x2 = mp.x2 === S.r ? '<div class="banner">Comodín ×2 activado en esta prueba</div>' : mp.x2 != null ? `<p class="muted">Ya gastasteis el comodín en «${esc(ROUNDS[mp.x2].name)}».</p>` : `<button class="btn full" data-act="x2">Usar el comodín ×2 aquí</button><p class="muted">Solo hay uno por pareja en todo el campeonato.</p>`;
     return `<section class="board stack"><div class="lbl">Prueba ${S.r + 1} de ${ROUNDS.length}</div><h1 class="rname" style="font-size:2.4rem">${esc(R.name)}</h1><ul class="rules" style="font-size:1rem">${R.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>${x2}</section>`;
@@ -1013,7 +1003,7 @@ function phoneMain() {
   if (S.ph === 'reveal' && S.res) return phoneReveal(R, mp);
   if (S.ph === 'tabla' || S.ph === 'fin') {
     const sorted = S.pairs.slice().sort((a, b) => b.sc - a.sc);
-    return `<section class="board stack"><div class="lbl">${S.ph === 'fin' ? 'Clasificación final' : 'Clasificación'}</div><div class="standing">${sorted.map((p, i) => `<div class="srow"><div class="pos">${i + 1}</div><div><div class="nm">${esc(p.n)}${p.id === mp.id ? ' ★' : ''}</div><div class="muted">${p.m.map(m => esc(nm(m))).join(' · ')}</div></div><span class="tn wide">${p.sc}</span></div>`).join('')}</div></section>`;
+    return `<section class="board stack"><div class="lbl">${S.ph === 'fin' ? 'Clasificación final' : 'Clasificación'}</div><div class="standing">${sorted.map((p, i) => `<div class="srow"><div class="pos">${i + 1}</div><div><div class="nm">${esc(p.n)}${p.id === mp.id ? ' ★' : ''}</div><div class="muted avs">${p.m.map(m => pwho(m)).join(' ')}</div></div><span class="tn wide">${p.sc}</span></div>`).join('')}</div></section>`;
   }
   return `<section class="board center"><p class="muted">Mira la tele.</p></section>`;
 }
@@ -1139,7 +1129,7 @@ function phoneReveal(R, mp) {
   }
   return `<section class="board center"><div class="lbl">Resultado · ${esc(mp.n)}</div><div class="gainbig">${g > 0 ? '+' : ''}${g}</div>${mp.x2 === S.r && g > 0 ? '<span class="pill x2">Con comodín ×2</span>' : ''}${info}</section>`;
 }
-function setName(n) { n = String(n || '').trim().slice(0, 40); if (!n) return; P.name = n; ls.set('name.' + gameCode, n); P.sig = ''; setPres({role: 'p', pid: P.pid, name: n, g: gameCode}); keepAwake(); playerRender(); }
+function setName(n) { n = String(n || '').trim().slice(0, 40); if (!n) return; P.name = n; P.avStep = true; ls.set('name.' + gameCode, n); P.sig = ''; setPres({role: 'p', pid: P.pid, name: n, g: gameCode}); keepAwake(); playerRender(); }
 const PACT = {
   pickname: v => setName(v),
   ans: v => { P.L.sel = +v; setPres({a: +v}); P.upd && P.upd(); },
@@ -1173,6 +1163,8 @@ const PACT = {
   vtap: v => { const L = P.L; if (L.sent) return; L.v = L.v.includes(v) ? L.v.filter(x => x !== v) : L.v.length < 3 ? [...L.v, v] : L.v; P.upd && P.upd(); },
   vreset: () => { if (P.L.sent) return; P.L.v = []; P.upd && P.upd(); },
   vsend: () => { const L = P.L; if (L.sent || !L.v.length) return; L.sent = true; setPres({a: {v: L.v, f: true}}); P.upd && P.upd(); },
+  avdone: () => { P.avStep = false; P.sig = ''; playerRender(); },
+  avchange: () => { P.avStep = true; P.sig = ''; playerRender(); },
   rename: () => { P.name = ''; ls.del('name.' + gameCode); P.sig = ''; playerRender(); }
 };
 let playerWired = false;
@@ -1187,6 +1179,12 @@ function connectPlayer() {
   net.onConnection(up => { if (up) { wasUp = true; roomState = 'ok'; } else if (!wasUp) roomState = 'pending'; if (!P.S) playerRender(); });
   setTimeout(() => { if (!wasUp) { roomState = 'none'; if (!P.S) { P.sig = ''; playerRender(); } } }, 12000);
   if (P.name) setPres({role: 'p', pid: P.pid, name: P.name, g: gameCode});
+  if (P.myAv) net.publishAv({g: gameCode, img: P.myAv});
+  net.onAv((pid, data) => {
+    if (!data || data.g !== gameCode) return;
+    if (isImg(data.img)) P.avs[pid] = data.img; else delete P.avs[pid];
+    if (P.S && ['lobby', 'sorteo', 'tabla', 'fin'].includes(P.S.ph) && !P.avStep) { P.sig = ''; playerRender(); }
+  });
   setInterval(() => { if (P.name) setPres({hb: Date.now()}); }, 8000);
 }
 function startPlayer() {
@@ -1232,6 +1230,18 @@ document.addEventListener('submit', ev => {
   if (f.id === 'gform' && role === 'player') { const g = $('#guess').value.trim(); if (!g) return; P.L.tried = g; setPres({a: g}); $('#guess').value = ''; P.upd && P.upd(); }
 });
 document.addEventListener('change', async ev => {
+  if ((ev.target.id === 'avcam' || ev.target.id === 'avfile') && role === 'player') {
+    const file = ev.target.files && ev.target.files[0]; if (!file) return;
+    try {
+      const img = await compressImage(file, 240, 40000, true);
+      P.myAv = img; ls.set('av', img);
+      if (room) room.publishAv({g: gameCode, img});
+      const pv = $('#avprev'); if (pv) pv.innerHTML = `<img src="${img}" alt="Tu foto">`;
+      const b = $('#avdone'); if (b) b.textContent = 'Listo, a jugar';
+      const hv = $('.mewrap .av'); if (hv) hv.outerHTML = pav(P.pid);
+    } catch (e) { toast('No he podido leer esa foto. Prueba con otra.'); }
+    return;
+  }
   if (ev.target.id !== 'tphoto' || role !== 'player') return;
   const file = ev.target.files && ev.target.files[0]; if (!file) return;
   try {

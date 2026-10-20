@@ -272,6 +272,19 @@ button.stg{cursor:pointer}
 .musicnote{font-size:.95rem;color:var(--muted)}
 .mlist{display:flex;flex-direction:column;gap:6px;font-size:.9rem}
 .mlist .bad{color:var(--red)}
+.av{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none;box-shadow:0 0 0 2px var(--gold);background:var(--deep);vertical-align:middle}
+.av.ini{display:inline-grid;place-items:center;background:linear-gradient(180deg,var(--tile-hi),var(--tile));color:var(--cream);font-family:var(--f-display);font-size:.8rem;line-height:1}
+.av.lg{width:64px;height:64px;font-size:1.6rem}
+.av.xl{width:110px;height:110px;font-size:2.6rem;box-shadow:0 0 0 4px var(--gold)}
+.who{display:inline-flex;align-items:center;gap:7px;min-width:0}
+.avs{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.pairc .avs .who{font-family:var(--f-cond);font-weight:700;font-size:clamp(1.1rem,2vw,1.6rem)}
+.mc .ms .av{width:22px;height:22px;font-size:.7rem;box-shadow:0 0 0 1.5px var(--gold)}
+.mewrap{display:flex;align-items:center;gap:10px;min-width:0}
+.mewrap .av{width:40px;height:40px;font-size:1rem}
+label.btn{box-sizing:border-box;display:block;text-align:center;max-width:100%}
+.avbig{width:180px;height:180px;border-radius:50%;overflow:hidden;margin:4px auto;display:grid;place-items:center;font-size:4.5rem;background:var(--deep);box-shadow:0 0 0 5px var(--gold),0 10px 24px var(--shade)}
+.avbig img{width:100%;height:100%;object-fit:cover;display:block}
 @media (max-width:860px){.lobby{grid-template-columns:minmax(0,1fr)}.runner{left:calc(var(--x,0) * (100% - 200px) + 8px);max-width:180px}}
 @media (prefers-reduced-motion:reduce){.eq.on i{animation:none;height:60%}.runner{transition:none}}
 </style>
@@ -280,6 +293,7 @@ button.stg{cursor:pointer}
 <div id="app" aria-live="polite"></div>
 <script src="mqtt.min.js"></script>
 <script src="qrcode.js"></script>
+<script src="content.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
