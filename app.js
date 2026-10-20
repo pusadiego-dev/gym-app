@@ -48,7 +48,7 @@ const ROUNDS = [
     'Cuenta la palabra más larga de la pareja: tantos puntos como letras. Con las nueve, 18.']},
   {id: 'bingo', kind: 'bingo', name: 'Bingo de emojis', steps: 1, rules: [
     'Cada uno tiene en el móvil un cartón con nueve pelis, series, dibujos o videojuegos.',
-    'En la tele salen pistas en emojis. Si es una de tu cartón, márcala.',
+    'En la tele salen pistas en emojis cada 10 segundos, solas. Si es una de tu cartón, márcala.',
     'Primera línea: 5 puntos. Bingo: 10 y se acaba. Cantar en falso: −2.']},
   {id: 'tapas', kind: 'tapas', name: 'Concurso de tapas', steps: 1, rules: [
     'Primero cada uno sube desde el móvil el nombre y una foto de su tapa.',
@@ -66,7 +66,7 @@ const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const TAPA_PTS = [10, 7, 5, 3];
 
 /* ---------- lógica compartida ---------- */
-const BINGO_SIZE = 30;
+const BINGO_SIZE = 30, BINGO_SECS = 10;
 function bingoDeck(gid) { return shuffle(range(EMOJI.length), seeded(gid + '#deck')).slice(0, BINGO_SIZE); }
 function bingoCard(gid, pid) { return shuffle(bingoDeck(gid), seeded(gid + ':' + pid)).slice(0, 9); }
 /* ---------- que no se repitan preguntas entre partidas ---------- */
@@ -344,7 +344,7 @@ function pubStep() {
     case 'letras': return {l: st.l};
     case 'dibujo': return {w: st.word.w, dr: st.dr, ok: Object.keys(G.ans).filter(p => G.ans[p].ok)};
     case 'cancion': { const pa = {}; for (const p in G.ans) { const pr = pairOf(p); if (pr) pa[pr.id] = [G.ans[p].v, p, G.ans[p].st]; } return {o: st.o, stage: st.stage, playing: H.playing, pa}; }
-    case 'bingo': return {cl: st.cl, cur: st.cur, prev: st.prev, li: st.li, bi: st.bi, msg: st.msg};
+    case 'bingo': return {cl: st.cl, cur: st.cur, prev: st.prev, li: st.li, bi: st.bi, msg: st.msg, nl: st.bi || st.cl.length >= BINGO_SIZE ? null : bingoLeft(), pz: !!st.pause};
     case 'tapas': { const items = {}; for (const id in G.items) items[id] = G.items[id].n; const r = tapaRace(); return {mode: st.mode, items, votes: r.votes, voters: r.voters}; }
     default: return {};
   }
@@ -539,7 +539,9 @@ function nextClue() {
   if (!left.length) return;
   if (st.cur != null) st.prev = EMOJI[st.cur].t;
   const i = left[Math.floor(Math.random() * left.length)]; st.cl.push(i); st.cur = i; st.msg = '';
+  st.next = Date.now() + BINGO_SECS * 1000;
 }
+function bingoLeft() { const st = H.G.step; return st.pause ? st.pause : Math.max(0, (st.next || 0) - Date.now()); }
 
 /* ----- música en el portátil ----- */
 function audioEl() { if (!H.audio) { H.audio = new Audio(); H.audio.preload = 'auto'; } return H.audio; }
@@ -786,7 +788,8 @@ function hostPlay() {
     }
     case 'bingo':
       main = `${head}<div class="center"><div class="lbl">Pista ${st.cl.length} de ${BINGO_SIZE}</div><div class="emoji">${st.cur != null ? EMOJI[st.cur].e : ''}</div>${st.prev ? `<p class="muted">La anterior era: <b>${esc(st.prev)}</b></p>` : ''}${st.msg ? `<div class="banner">${esc(st.msg)}</div>` : ''}${st.li ? `<p class="muted">Línea cantada por ${esc(pname(st.li))}</p>` : ''}</div>`;
-      extra = `<button class="btn ghost" data-act="clue"${st.bi || st.cl.length >= BINGO_SIZE ? ' disabled' : ''}>Siguiente pista</button>`; break;
+      main += st.bi || st.cl.length >= BINGO_SIZE ? '' : `<div class="center"><div class="lbl">${st.pause ? 'En pausa' : 'Siguiente pista en'}</div><div class="target" id="bcount">${Math.ceil(bingoLeft() / 1000)}</div></div>`;
+      extra = st.bi ? '' : `<button class="btn ghost" data-act="bpause">${st.pause ? 'Seguir' : 'Pausar'}</button><button class="btn ghost" data-act="clue"${st.cl.length >= BINGO_SIZE ? ' disabled' : ''}>Saltar a la siguiente</button>`; break;
     case 'tapas':
       if (st.mode === 'entry') {
         const ids = Object.keys(G.items);
@@ -875,7 +878,14 @@ function hostRender() {
   hostTick();
 }
 function hostTick() {
-  const G = H.G; if (!G || G.phase !== 'play' || !H.deadline) return;
+  const G = H.G; if (!G || G.phase !== 'play') return;
+  if (curRound().kind === 'bingo') {
+    const st = G.step; if (st.bi || st.cl.length >= BINGO_SIZE) return;
+    const left = bingoLeft(); const el = $('#bcount'); if (el) el.textContent = Math.ceil(left / 1000);
+    if (!st.pause && left <= 0) { nextClue(); changed(); send(true); }
+    return;
+  }
+  if (!H.deadline) return;
   const left = H.deadline - Date.now(); setClock(left, curRound().secs * 1000);
   if (left < -800) toReveal();
 }
@@ -890,7 +900,8 @@ const HACT = {
   swapsong: () => swapSong(),
   listen: () => { stopMusic(); playFor(20000).then(renderSoon); renderSoon(); },
   checkmusic: () => { H.musicCheck = true; prefetchSongs(true); hostRender(); },
-  clue: () => { nextClue(); changed(); send(true); },
+  clue: () => { const st = H.G.step; st.pause = 0; nextClue(); changed(); send(true); },
+  bpause: () => { const st = H.G.step; if (st.pause) { st.next = Date.now() + st.pause; st.pause = 0; } else st.pause = Math.max(1000, (st.next || 0) - Date.now()); changed(); send(true); },
   jury: v => { const r = H.G.res; if (r && r.w[v] && !r.done) { r.w[v][1] = !r.w[v][1]; letrasPts(r); changed(); } },
   adj: v => { const [id, d] = v.split(':'); const p = H.G.pairs.find(x => x.id === id); if (p) { p.sc += +d; H.G.log.push({r: H.G.r, s: -1, e: {[id]: +d}}); changed(); } },
   join: v => { const [pid, id] = v.split(':'); const p = H.G.pairs.find(x => x.id === id); if (p && !pairOf(pid)) { p.m.push(pid); changed(); } },
@@ -1056,8 +1067,8 @@ function phonePlay(R, mp) {
     }
     case 'bingo': {
       const card = bingoCard(S.gid, P.pid); if (!L.m) { L.m = []; L.cn = 0; }
-      P.upd = () => { $$('.card button').forEach((b, i) => b.classList.toggle('on', L.m.includes(i))); const el = $('#bmsg'); if (el) el.textContent = P.S.d.msg || `Pistas: ${P.S.d.cl.length}`; const lb = $('[data-act="claim"][data-v="l"]'); if (lb) lb.disabled = !!P.S.d.li; };
-      return `<section class="stack"><div class="lbl">Tu cartón · las pistas salen en la tele</div><div class="card">${card.map((ix, i) => `<button data-act="mark" data-v="${i}">${esc(EMOJI[ix].t)}</button>`).join('')}</div><div class="row" style="justify-content:center"><button class="btn red" data-act="claim" data-v="l">¡Línea!</button><button class="btn" data-act="claim" data-v="b">¡Bingo!</button></div><p class="status" id="bmsg"></p></section>`;
+      P.upd = () => { $$('.card button').forEach((b, i) => b.classList.toggle('on', L.m.includes(i))); const el = $('#bmsg'); P.bnext = P.S.d.nl != null ? Date.now() + P.S.d.nl : 0; P.bpz = P.S.d.pz; if (el) el.textContent = P.S.d.msg || `Pistas: ${P.S.d.cl.length}`; bingoPhoneTick(); const lb = $('[data-act="claim"][data-v="l"]'); if (lb) lb.disabled = !!P.S.d.li; };
+      return `<section class="stack"><div class="lbl">Tu cartón · las pistas salen en la tele</div><div class="card">${card.map((ix, i) => `<button data-act="mark" data-v="${i}">${esc(EMOJI[ix].t)}</button>`).join('')}</div><div class="row" style="justify-content:center"><button class="btn red" data-act="claim" data-v="l">¡Línea!</button><button class="btn" data-act="claim" data-v="b">¡Bingo!</button></div><p class="status" id="bmsg"></p><p class="muted center" id="bnext"></p></section>`;
     }
     case 'tapas': {
       if (d.mode === 'entry') {
@@ -1082,6 +1093,10 @@ function phonePlay(R, mp) {
     }
   }
   return '';
+}
+function bingoPhoneTick() {
+  const el = $('#bnext'); if (!el) return;
+  el.textContent = P.bpz ? 'Pistas en pausa' : P.bnext ? `Siguiente pista en ${Math.max(0, Math.ceil((P.bnext - Date.now()) / 1000))} s` : '';
 }
 function cifrasUpd() {
   const L = P.L, d = P.S.d;
@@ -1211,7 +1226,8 @@ function render() {
 }
 setInterval(() => {
   if (role === 'host') hostTick();
-  else if (role === 'player' && P.S && P.S.ph === 'play' && P.deadline) { const R = ROUNDS[P.S.r]; if (R && R.secs) setClock(P.deadline - Date.now(), R.secs * 1000); }
+  if (role === 'player' && P.S && P.S.ph === 'play') bingoPhoneTick();
+  if (role === 'player' && P.S && P.S.ph === 'play' && P.deadline) { const R = ROUNDS[P.S.r]; if (R && R.secs) setClock(P.deadline - Date.now(), R.secs * 1000); }
 }, 250);
 
 /* ---------- eventos ---------- */

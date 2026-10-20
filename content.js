@@ -603,7 +603,7 @@ const EMOJI = [
   E('Pac-Man', '🟡👻🍒'), E('Los Pitufos', '🔵🍄🏘️'), E('Doraemon', '🐱🔵🚪'), E('Gremlins', '🐾💧🌙'), E('Los Goonies', '🗺️🏴‍☠️💎'),
   E('Las Tortugas Ninja', '🐢🥷🍕'), E('Transformers', '🚗🤖🔄'), E('Terminator', '🤖🕶️🔫'), E('Jungla de cristal', '🏢👮🎄'), E('Speed', '🚌💣🏎️'),
   E('Arma letal', '👮👮💥'), E('La Roca', '🏝️⛓️🚀'), E('Independence Day', '🛸🇺🇸💥'), E('Armageddon', '☄️🚀🌍'), E('Men in Black', '🕶️👽⚫'),
-  E('Piratas del Caribe', '🏴‍☠️🦜⚓'), E('Jurassic Park', '🦕🦖🧬'), E('Spiderman', '🕷️🕸️🏙️'), E('Batman', '🦇🌃🃏'), E('Superman', '🦸‍♂️🔴🌎'),
+  E('Piratas del Caribe', '🏴‍☠️🦜⚓'), E('Spiderman', '🕷️🕸️🏙️'), E('Batman', '🦇🌃🃏'), E('Superman', '🦸‍♂️🔴🌎'),
   E('King Kong', '🦍🏙️✈️'), E('Godzilla', '🦎🏙️🔥'), E('Ghost', '👻🏺💑'), E('Gladiator', '⚔️🏟️🦁'), E('Braveheart', '🏴󠁧󠁢󠁳󠁣󠁴󠁿⚔️💙'),
   E('Breaking Bad', '🧪💎🚐'), E('Juego de tronos', '🐉👑❄️'), E('Stranger Things', '🚲🔦🧇'), E('La casa de papel', '🎭💶🏦'), E('Aquí no hay quien viva', '🏢🗣️👵'),
   E('Bob Esponja', '🧽🍍🌊'), E('Sonic', '🦔💨💍'), E('Tetris', '🟦🟥🟨'), E('Zelda', '🗡️🛡️🧝'), E('Street Fighter', '👊🔥🥋')
