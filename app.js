@@ -210,14 +210,14 @@ function compressImage(file, m = 560, limit = 90000, square = false) {
 }
 
 /* ---------- red: MQTT público, sin cuentas ---------- */
-const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081'];
+const BROKERS = ['wss://mqtt.eclipseprojects.io:443/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081'];
 function brokerUrl(i) { return params.get('broker') || BROKERS[i] || BROKERS[0]; }
 function makeNet(code, url, isHost, me) {
   const base = 'vr26/' + code + '/';
   const L = {st: [], peers: [], img: [], av: [], conn: []};
   const peers = new Map(), seen = new Map();
   let mine = {}, pubT = 0, lastPub = 0, peersT = 0, up = false;
-  const client = window.mqtt.connect(url, {clientId: 'vr' + rid(10), keepalive: 30, reconnectPeriod: 2500, connectTimeout: 9000, clean: true});
+  const client = window.mqtt.connect(url, {clientId: 'vr' + rid(10), keepalive: 30, reconnectPeriod: 2500, connectTimeout: 7000, clean: true});
   const firePeers = () => { if (peersT) return; peersT = setTimeout(() => { peersT = 0; const ch = {peers: api.peers()}; L.peers.forEach(f => f(ch)); }, 60); };
   const pubPres = () => {
     pubT = 0; lastPub = Date.now();
@@ -918,7 +918,7 @@ function connectHost() {
     const bi = order[tried]; const net = makeNet(G.gid, brokerUrl(bi), true, 'host');
     let ok = false;
     net.onConnection(up => { if (up && !ok) { ok = true; room = net; roomState = 'ok'; if (G.bi !== bi) { G.bi = bi; saveSoon(); } wireHost(); renderSoon(); } else if (ok) { roomState = up ? 'ok' : 'pending'; renderSoon(); } });
-    setTimeout(() => { if (!ok) { net.end(); tried++; if (tried < order.length && !params.get('broker')) attempt(); else { roomState = 'none'; renderSoon(); setTimeout(() => { tried = 0; roomState = 'pending'; renderSoon(); attempt(); }, 15000); } } }, 9000);
+    setTimeout(() => { if (!ok) { net.end(); tried++; if (tried < order.length && !params.get('broker')) attempt(); else { roomState = 'none'; renderSoon(); setTimeout(() => { tried = 0; roomState = 'pending'; renderSoon(); attempt(); }, 15000); } } }, 8000);
   };
   attempt();
 }
