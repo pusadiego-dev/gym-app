@@ -707,7 +707,7 @@ function hostMain() {
         <form id="addoff" class="row"><input class="txt" id="offname" maxlength="40" placeholder="Añadir a alguien sin móvil" style="flex:1;min-width:0"><button class="btn ghost" type="submit">Añadir</button></form>
         <div class="row end"><button class="btn big" data-act="next"${ids.length < 2 ? ' disabled' : ''}>Sortear parejas</button></div>
       </section></div>
-      <aside class="qrcard"><div class="lbl">Escanea para jugar</div>${roomState === 'ok' ? qrSVG(url) : `<p style="padding:40px 10px">${roomState === 'none' ? 'No hay conexión. Comprueba el wifi del portátil y recarga.' : 'Conectando…'}</p>`}<b>Código ${esc(G.gid)}</b><span class="url">${esc(url)}</span></aside></div>`;
+      <aside class="qrcard"><div class="lbl">Escanea para jugar</div>${qrSVG(url)}${roomState === 'ok' ? '' : `<p><b style="font-size:1rem">${roomState === 'none' ? 'Sin conexión con el servidor de la partida. Sigo probando; si tarda, conecta el portátil a los datos de un móvil.' : 'Conectando con el servidor… (puede tardar hasta medio minuto)'}</b></p>`}<b>Código ${esc(G.gid)}</b><span class="url">${esc(url)}</span></aside></div>`;
   }
   if (G.phase === 'sorteo') {
     const anim = H.sorteoAnim; H.sorteoAnim = false;
