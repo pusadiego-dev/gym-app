@@ -542,17 +542,21 @@ const cardioThumb = (c) => `<svg class="thumb" viewBox="0 0 200 200" aria-hidden
 
 // EJERCICIOS
 let exFilter = { m: "", t: "", q: "" };
+// Búsqueda sin tildes ni mayúsculas; todas las palabras deben aparecer (nombre, variantes, músculos o material).
+const norm = (x) => String(x).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const exText = (e) => norm([e.nombre, MUSCLES[e.musculo], ...e.secundarios.map((m) => MUSCLES[m]), ...e.variantes.map((v) => `${v.nombre} ${VARIANT_LABEL[v.tipo]}${v.uni ? " unilateral" : ""}`)].join(" "));
+const exMatch = (e, q) => norm(q).split(/\s+/).filter(Boolean).every((w) => exText(e).includes(w));
 function viewExercises() {
   const cardioOnly = exFilter.m === "cardio";
-  const clist = exFilter.t || (exFilter.m && !cardioOnly) ? [] : CARDIO.filter((c) => !exFilter.q || (c.nombre + " " + c.sub + " cardio").toLowerCase().includes(exFilter.q.toLowerCase()));
+  const clist = exFilter.t || (exFilter.m && !cardioOnly) ? [] : CARDIO.filter((c) => norm(exFilter.q).split(/\s+/).filter(Boolean).every((w) => norm(c.nombre + " " + c.sub + " cardio").includes(w)));
   const tOk = (v) => (exFilter.t === "uni" ? v.uni : v.tipo === exFilter.t);
-  const list = cardioOnly ? [] : EXERCISES.filter((e) => (!exFilter.m || e.musculo === exFilter.m) && (!exFilter.t || e.variantes.some(tOk)) && (!exFilter.q || (e.nombre + e.variantes.map((v) => v.nombre).join(" ")).toLowerCase().includes(exFilter.q.toLowerCase())));
+  const list = cardioOnly ? [] : EXERCISES.filter((e) => (!exFilter.m || e.musculo === exFilter.m) && (!exFilter.t || e.variantes.some(tOk)) && (!exFilter.q || exMatch(e, exFilter.q)));
   return `
   <header class="page-h"><h1>Ejercicios</h1><p class="muted">${EXERCISES.length} ejercicios con ${EXERCISES.reduce((n, e) => n + e.variantes.length, 0)} variantes y ${CARDIO.length} actividades de cardio, con su técnica animada.</p></header>
   <input class="search" type="search" placeholder="Buscar ejercicio…" value="${esc(exFilter.q)}" data-filter="q">
   <div class="chips scroll">${[["", "Todos"], ["cardio", "Cardio"], ...Object.entries(MUSCLES)].map(([k, l]) => `<button class="chip ${exFilter.m === k ? "on" : ""}" data-act="filterM" data-v="${k}">${l}</button>`).join("")}</div>
   <div class="chips">${[["", "Todo el material"], ...Object.entries(VARIANT_LABEL), ["uni", "Unilateral"]].map(([k, l]) => `<button class="chip ${exFilter.t === k ? "on" : ""}" data-act="filterT" data-v="${k}">${l}</button>`).join("")}</div>
-  <div class="ex-grid">${list.map((e) => {
+  <div class="ex-grid" id="exGrid">${list.map((e) => {
     const vi = exFilter.t ? Math.max(0, e.variantes.findIndex(tOk)) : 0;
     return `<a class="ex-card" href="#/ejercicio/${e.id}/${vi}">${animSvg(e.variantes[vi].anim, "thumb")}<b>${esc(e.nombre)}</b><span class="muted small">${MUSCLES[e.musculo]} · ${[...new Set(e.variantes.map((v) => VARIANT_LABEL[v.tipo]))].join(", ")}${e.variantes.some((v) => v.uni) ? " · unilateral" : ""}</span></a>`;
   }).join("")}${clist.map((c) => `<a class="ex-card" href="#/cardio/${c.id}">${cardioThumb(c)}<b>${esc(c.nombre)}</b><span class="muted small">Cardio · ${esc(c.sub)}</span></a>`).join("")}${list.length || clist.length ? "" : `<p class="muted">Sin resultados.</p>`}</div>`;
@@ -1485,12 +1489,23 @@ function editRoutine(fn, close) {
   rerenderKeepScroll();
 }
 function pickExercise(cb, grupos = []) {
-  const btn = (x) => `<button class="opt-btn" data-pick="${x.id}">${animSvg(x.variantes[0].anim, "thumb")}<span><b>${esc(x.nombre)}</b><small>${MUSCLES[x.musculo]}</small></span></button>`;
-  const mine = EXERCISES.filter((x) => grupos?.includes(x.musculo)), rest = EXERCISES.filter((x) => !grupos?.includes(x.musculo));
-  modal(`<h2>Elegir ejercicio</h2><input class="search" type="search" placeholder="Buscar…" id="pickQ"><div class="opt-list" id="pickList">${mine.length ? `<p class="eyebrow">De este día</p>${mine.map(btn).join("")}<p class="eyebrow">Otros ejercicios</p>` : ""}${rest.map(btn).join("")}</div>`, (m) => {
-    $("#pickQ", m).addEventListener("input", (ev) => {
-      const q = ev.target.value.toLowerCase();
-      m.querySelectorAll("[data-pick]").forEach((b) => (b.hidden = !b.textContent.toLowerCase().includes(q)));
+  const btn = (x) => `<button class="opt-btn" data-pick="${x.id}">${animSvg(x.variantes[0].anim, "thumb")}<span><b>${esc(x.nombre)}</b><small>${MUSCLES[x.musculo]}${x.secundarios.length ? ` · ${x.secundarios.map((k) => MUSCLES[k].toLowerCase()).join(", ")}` : ""}</small></span></button>`;
+  let q = "", mus = "";
+  const listHtml = () => {
+    const all = EXERCISES.filter((x) => (!mus || x.musculo === mus) && (!q || exMatch(x, q)));
+    if (!all.length) return `<p class="muted">Sin resultados.</p>`;
+    const mine = !mus && !q ? all.filter((x) => grupos?.includes(x.musculo)) : [];
+    const rest = all.filter((x) => !mine.includes(x));
+    return mine.length ? `<p class="eyebrow">De este día</p>${mine.map(btn).join("")}<p class="eyebrow">Otros ejercicios</p>${rest.map(btn).join("")}` : rest.map(btn).join("");
+  };
+  const chips = () => [["", "Todos"], ...Object.entries(MUSCLES)].map(([k, l]) => `<button type="button" class="chip ${mus === k ? "on" : ""}" data-pickm="${k}">${l}</button>`).join("");
+  modal(`<h2>Elegir ejercicio</h2><input class="search" type="search" placeholder="Buscar ejercicio o músculo…" id="pickQ"><div class="chips scroll" id="pickM">${chips()}</div><div class="opt-list" id="pickList">${listHtml()}</div>`, (m) => {
+    const redraw = () => { $("#pickList", m).innerHTML = listHtml(); mountAnims($("#pickList", m)); };
+    $("#pickQ", m).addEventListener("input", (ev) => { q = ev.target.value; redraw(); });
+    $("#pickM", m).addEventListener("click", (ev) => {
+      const c = ev.target.closest("[data-pickm]");
+      if (!c) return;
+      mus = c.dataset.pickm; $("#pickM", m).innerHTML = chips(); redraw();
     });
     m.querySelector("#pickList").addEventListener("click", (ev) => {
       const b = ev.target.closest("[data-pick]");
@@ -1513,10 +1528,11 @@ document.addEventListener("click", (ev) => {
 document.addEventListener("input", (ev) => {
   const t = ev.target;
   if (t.dataset.filter) {
+    // Solo se redibuja la lista: rehacer el campo cerraba el teclado en el iPhone.
     exFilter.q = t.value;
-    const pos = t.selectionStart;
-    render();
-    const n = $(".search"); n.focus(); n.setSelectionRange(pos, pos);
+    const grid = new DOMParser().parseFromString(viewExercises(), "text/html").getElementById("exGrid");
+    $("#exGrid").replaceWith(grid);
+    mountAnims(grid);
   }
   if (t.id === "alarmVol") $("#alarmVolOut").textContent = `${t.value} %`;
   if (t.dataset.set) {

@@ -1,5 +1,13 @@
 # Notas de versión
 
+## Versión 26 · 11 de noviembre de 2026
+
+- Arreglado el buscador de ejercicios, tanto en Ejercicios como al añadir un ejercicio a tu rutina o al entreno. Ya no se cierra el teclado del iPhone al escribir, da igual que pongas tildes o no («jalon», «triceps»…) y también encuentra por músculo o material («espalda», «polea», «cuerda»).
+- Al añadir un ejercicio a la rutina hay filtros por grupo muscular.
+- Jalones y tirones con cuerda: jalón con cuerda al pecho, jalón con cuerda de rodillas, jalón de brazos rectos con cuerda (pullover en polea), remo sentado con cuerda, agarre estrecho y supino, dominadas supinas y asistidas.
+- 18 ejercicios nuevos: jalón con brazos rectos, hiperextensiones, encogimientos de trapecio, press declinado, pullover, elevaciones frontales, remo al mentón, patada de tríceps, press con agarre cerrado, curl inverso, buenos días, abducción y aducción de cadera, rueda abdominal, giros rusos, press Pallof, leñador en polea y bicho muerto.
+- Más de 60 variantes nuevas en los que ya había: multipower, sentadilla frontal, hack y péndulo, peso muerto sumo y con barra hexagonal, press Arnold, curl con barra Z, araña y Bayesian, cruces de poleas, step-up, zancadas caminando, curl nórdico, puente de glúteo, plancha lateral y muchas más. En total, 45 ejercicios con 212 variantes.
+
 ## Versión 25 · 10 de octubre de 2026
 
 - Diario de vacaciones: al apuntar una actividad puedes añadir fotos (hasta 6), haciéndolas con la cámara en el momento o eligiéndolas de la galería. Se ven en miniatura en cada día y en grande al tocarlas.
